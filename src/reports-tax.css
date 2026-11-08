@@ -1,0 +1,617 @@
+.report-toolbar,
+.tax-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.period-navigation,
+.period-fields,
+.payslip-actions,
+.alert-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.period-navigation strong {
+  min-width: 210px;
+  text-align: center;
+}
+
+.period-navigation input,
+.period-fields input,
+.adjustment-form input,
+.adjustment-form select {
+  padding: 10px 11px;
+  color: var(--ink);
+  background: white;
+  border: 1px solid #dce1ea;
+  border-radius: 10px;
+}
+
+.period-fields label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.report-stats {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.week-day-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.day-report-card {
+  padding: 14px;
+  text-align: left;
+  color: var(--ink);
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  cursor: pointer;
+}
+
+.day-report-card:hover {
+  transform: translateY(-2px);
+  border-color: #a5b4fc;
+  box-shadow: 0 10px 25px #26315210;
+}
+
+.day-report-card header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 12px;
+  color: var(--indigo);
+}
+
+.day-report-card > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 0;
+  border-top: 1px solid #f0f2f6;
+  font-size: 11px;
+}
+
+.day-report-card span {
+  color: var(--muted);
+}
+
+.month-calendar {
+  overflow: hidden;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+
+.month-labels,
+.month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.month-labels {
+  color: #525c70;
+  background: #f5f6fa;
+  border-bottom: 1px solid var(--line);
+}
+
+.month-labels strong {
+  padding: 10px;
+  text-align: center;
+  font-size: 11px;
+}
+
+.month-grid > button,
+.month-blank {
+  min-height: 105px;
+  padding: 10px;
+  text-align: left;
+  background: white;
+  border: 0;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.month-grid > button {
+  cursor: pointer;
+}
+
+.month-grid > button:hover,
+.month-grid > button.has-work {
+  background: #f7f7ff;
+}
+
+.month-grid > button strong,
+.month-grid > button span,
+.month-grid > button small {
+  display: block;
+}
+
+.month-grid > button span {
+  margin-top: 12px;
+  color: var(--indigo);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.month-grid > button small {
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.report-job-list {
+  display: grid;
+  gap: 8px;
+}
+
+.report-job-list article {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.report-job-list small,
+.report-job-list strong {
+  display: block;
+}
+
+.report-job-list small {
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.report-job-list article > span:last-child {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+}
+
+.report-explanation,
+.official-guidance {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 16px;
+  background: #eef0ff;
+  border-radius: 14px;
+  color: #3f36a8;
+}
+
+.report-explanation svg,
+.official-guidance svg {
+  flex: none;
+}
+
+.report-explanation strong,
+.official-guidance strong {
+  display: block;
+}
+
+.report-explanation p,
+.official-guidance p {
+  margin: 4px 0 0;
+  color: #616b7c;
+  font-size: 13px;
+}
+
+.official-guidance a {
+  color: var(--indigo);
+  text-decoration: underline;
+}
+
+.tax-status {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.tax-status strong,
+.tax-status span {
+  display: block;
+}
+
+.tax-status span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tax-status.ready {
+  color: var(--green);
+}
+
+.tax-status.draft {
+  color: var(--amber);
+}
+
+.tax-settings-card,
+.vat-return-card,
+.income-tax-card {
+  margin-bottom: 18px;
+  padding: 22px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 8px 30px #2631520b;
+}
+
+.tax-settings-card .section-title svg,
+.income-tax-card .section-title svg {
+  color: var(--indigo);
+}
+
+.tax-blockers {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 16px;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 14px;
+}
+
+.tax-blockers svg {
+  flex: none;
+}
+
+.tax-blockers p {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+.tax-source-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.tax-source-grid > div {
+  padding: 15px;
+  background: #171e31;
+  border-radius: 13px;
+  color: white;
+}
+
+.tax-source-grid span,
+.tax-source-grid strong {
+  display: block;
+}
+
+.tax-source-grid span {
+  color: #aeb7c7;
+  font-size: 11px;
+}
+
+.tax-source-grid strong {
+  margin-top: 6px;
+  font: 700 20px Manrope;
+}
+
+.vat-return-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.vat-return-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px;
+  color: white;
+  background: #13233b;
+}
+
+.vat-return-heading h2,
+.vat-return-heading p {
+  margin: 3px 0 0;
+}
+
+.vat-return-heading .eyebrow {
+  color: #8be1c3;
+}
+
+.vat-group-title {
+  padding: 9px 22px;
+  color: #475569;
+  background: #e8eef2;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .05em;
+}
+
+.vat-box {
+  display: grid;
+  grid-template-columns: 1fr 210px;
+  gap: 18px;
+  align-items: center;
+  min-height: 77px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.vat-box.calculated {
+  background: #f6f8fa;
+}
+
+.vat-box strong,
+.vat-box small {
+  display: block;
+}
+
+.vat-box small {
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.vat-box output {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  overflow: hidden;
+  text-align: right;
+  background: white;
+  border: 1px solid #cad2dc;
+  border-radius: 9px;
+  font-weight: 700;
+}
+
+.vat-box output span {
+  padding: 11px;
+  text-align: center;
+  background: #edf1f4;
+}
+
+.vat-box output > strong {
+  padding: 11px 13px;
+  text-align: right;
+}
+
+.vat-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 18px 22px;
+}
+
+.primary-button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.adjustment-form {
+  display: grid;
+  grid-template-columns: 145px minmax(220px, 1.4fr) 130px 120px 1fr auto;
+  gap: 8px;
+}
+
+.adjustment-list {
+  display: grid;
+  gap: 4px;
+  margin-top: 15px;
+}
+
+.adjustment-list > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.adjustment-list strong,
+.adjustment-list small {
+  display: block;
+}
+
+.adjustment-list small {
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.adjustment-list > div > span:last-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.income-periods {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.income-periods article {
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+}
+
+.income-periods h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.income-periods article > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.income-periods .income-profit {
+  padding-top: 11px;
+  border-bottom: 0;
+  color: var(--indigo);
+  font-weight: 800;
+}
+
+.income-tax-card > p {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.alert.green {
+  color: #047857;
+  background: #ecfdf5;
+}
+
+.alert-links {
+  margin-left: auto;
+}
+
+.alert-links a {
+  padding: 6px 9px;
+  color: #065f46;
+  background: #d1fae5;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@media (max-width: 1200px) {
+  .week-day-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .adjustment-form {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .tax-source-grid,
+  .report-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .week-day-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .report-toolbar,
+  .tax-status-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .period-navigation {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 760px) {
+  .week-day-grid,
+  .income-periods,
+  .tax-source-grid,
+  .report-stats,
+  .adjustment-form {
+    grid-template-columns: 1fr;
+  }
+
+  .period-navigation strong {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .period-navigation input,
+  .period-fields,
+  .period-fields label,
+  .period-fields input {
+    width: 100%;
+  }
+
+  .month-calendar {
+    overflow-x: auto;
+  }
+
+  .month-labels,
+  .month-grid {
+    min-width: 700px;
+  }
+
+  .vat-box {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .vat-box output {
+    width: 100%;
+  }
+
+  .vat-actions > button {
+    width: 100%;
+  }
+
+  .adjustment-list > div {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .alert.green {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .alert-links {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
+@media print {
+  body {
+    background: white;
+  }
+
+  .sidebar,
+  .bottom-nav,
+  .page-header,
+  .tax-status-row,
+  .tax-settings-card,
+  .tax-blockers,
+  .tax-source-grid,
+  .income-tax-card,
+  .official-guidance,
+  .vat-actions {
+    display: none !important;
+  }
+
+  .main {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .vat-return-card {
+    box-shadow: none;
+  }
+}

@@ -1,0 +1,19 @@
+import { ArrowRight, CalendarDays, CalendarRange, CarFront, ListPlus, MapPin, ReceiptPoundSterling, Route, Wallet } from "lucide-react";
+import { Link } from "react-router-dom";
+import { PageHeader, StatCard, Empty, number, money, StatusPill } from "../components/Ui";
+import { useData } from "../store/DataContext";
+import { tFor } from "../i18n";
+import { addDays, formatDate, mondayOf, todayIso } from "../lib/date";
+import { summarize } from "../lib/analytics";
+import { useState } from "react";
+
+export function Dashboard(){
+ const {data,language}=useData(),t=tFor(language); const [date,setDate]=useState(todayIso()); const start=mondayOf(date), end=addDays(start,6); const stats=summarize(data,start,end);
+ const dayJobs=data.jobs.filter(j=>j.collectionDate===date||j.deliveryDate===date).sort((a,b)=>(a.collectionTime||a.deliveryTime).localeCompare(b.collectionTime||b.deliveryTime));
+ return <><PageHeader eyebrow={formatDate(date,language)} title={t("calendar")} subtitle={language==="ro"?"Tot ce ai de făcut și toate cifrele tale, într-un singur loc.":"Everything you need to do and every number that matters."} action={<Link className="primary-button" to="/collect">+ {t("collect")}</Link>}/>
+ <section className="hero-grid"><div className="date-card"><CalendarDays size={22}/><label>{t("selectDate")}<input type="date" value={date} onChange={e=>setDate(e.target.value)}/></label><div className="week-label">{t("weekOf")} {formatDate(start,language)}</div></div>
+ <div className="quick-actions"><Link to="/collect"><CarFront/><span><strong>{t("newCollection")}</strong><small>{language==="ro"?"Începe un job nou":"Start a new job"}</small></span><ArrowRight/></Link><Link to="/deliver"><Route/><span><strong>{t("completeDelivery")}</strong><small>{stats.active} {t("activeCars").toLowerCase()}</small></span><ArrowRight/></Link><Link to="/catch-up"><ListPlus/><span><strong>{t("catchUp")}</strong><small>{language==="ro"?"Adaugă rapid joburi deja terminate":"Quickly add completed jobs"}</small></span><ArrowRight/></Link><Link to="/reports"><CalendarRange/><span><strong>{t("reports")}</strong><small>{language==="ro"?"Zi, săptămână și lună":"Day, week and month"}</small></span><ArrowRight/></Link><Link to="/tax"><ReceiptPoundSterling/><span><strong>{t("tax")}</strong><small>{language==="ro"?"Draft VAT și Income Tax":"VAT and Income Tax draft"}</small></span><ArrowRight/></Link></div></section>
+ <section className="stats-grid"><StatCard label={t("delivered")} value={String(stats.delivered)} detail={t("thisWeek")} tone="green"/><StatCard label={t("miles")} value={number(stats.miles)} detail={t("thisWeek")}/><StatCard label={t("earnings")} value={money(stats.earnings)} detail={t("thisWeek")} tone="amber"/><StatCard label={t("profit")} value={money(stats.profit)} detail={`${t("expenses")}: ${money(stats.actualCosts)}`}/></section>
+ <section className="section-block"><div className="section-title"><div><h2>{formatDate(date,language)}</h2><p>{dayJobs.length} {language==="ro"?"înregistrări":"records"}</p></div></div>{!dayJobs.length?<Empty>{t("noJobsToday")}</Empty>:<div className="job-list">{dayJobs.map(j=><article className="job-card" key={j.id}><div className="job-main"><span className="reg">{j.registration||"NO REG"}</span><div><h3>{j.makeModel||j.jobRef||"Car"}</h3><p><MapPin size={14}/>{j.pickupTown||"?"} <ArrowRight size={13}/> {j.deliveryTown||"?"}</p></div></div><div className="job-meta"><StatusPill status={j.status}/><strong>{number(j.actualMiles??j.payslipMiles??j.estimatedMiles??0)} mi</strong></div></article>)}</div>}</section>
+ <Link className="comparison-banner" to="/payslips"><Wallet/><div><strong>{t("currentWeekCompare")}</strong><span>{language==="ro"?"Încarcă PDF-ul și verifică plata, job cu job.":"Upload the PDF and verify payment job by job."}</span></div><ArrowRight/></Link></>;
+}
