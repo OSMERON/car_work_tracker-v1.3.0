@@ -1,7 +1,14 @@
 import type { AppData, Expense, Job } from "../types";
 import { addDays, isoInRange, mondayOf } from "./date";
 
-export const jobMiles = (job: Job) => job.actualMiles ?? job.payslipMiles ?? job.estimatedMiles ?? 0;
+export const odometerMiles = (start: number | null | undefined, end: number | null | undefined) => {
+  if (start === null || start === undefined || end === null || end === undefined) return null;
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
+  return Math.round((end - start + Number.EPSILON) * 10) / 10;
+};
+
+export const jobMiles = (job: Job) => job.payslipMiles ?? job.estimatedMiles ?? 0;
+export const jobDrivenMiles = (job: Job) => job.actualMiles ?? odometerMiles(job.odometerStart, job.odometerEnd) ?? jobMiles(job);
 export const jobEarnings = (job: Job) => (job.tariffPaid ?? 0) + (job.waitingPaid ?? 0);
 
 export interface PeriodSummary {

@@ -46,6 +46,9 @@ export interface Expense {
   claimed: number;
   approved: number;
   receipt: boolean;
+  vatAmount?: number;
+  vatReclaimable?: boolean;
+  includeInTax?: boolean;
   notes: string;
   source: "manual" | "payslip";
 }
@@ -97,6 +100,8 @@ export interface AppData {
   taxSettings?: TaxSettings;
   taxAdjustments?: TaxAdjustment[];
   confirmedTaxPeriods?: string[];
+  dailyLogs?: DailyLog[];
+  performanceSettings?: PerformanceSettings;
 }
 
 export type VatIncomeTreatment = "unknown" | "vat-inclusive" | "vat-exclusive";
@@ -106,12 +111,36 @@ export type TaxAdjustmentType = "other-sales-gross" | "other-output-vat" | "box2
 export interface TaxSettings {
   businessName: string;
   vatNumber: string;
-  scheme: "flat-rate";
-  flatRatePercent: number | null;
+  scheme: "standard";
+  flatRatePercent?: number | null;
   salesVatRate: number;
   accountingBasis: "cash" | "invoice";
   vatIncomeTreatment: VatIncomeTreatment;
   reimbursementVatTreatment: ReimbursementVatTreatment;
+}
+
+export type DayWorkStatus = "worked" | "not-worked" | "unavailable" | "day-off" | "holiday" | "sick" | "no-jobs";
+
+export interface DailyLog {
+  id: string;
+  date: string;
+  status: DayWorkStatus;
+  leftHomeTime: string;
+  returnedHomeTime: string;
+  productiveMinutes: number;
+  waitingMinutes: number;
+  publicTransportMinutes: number;
+  reason: string;
+  notes: string;
+  updatedAt: string;
+}
+
+export interface PerformanceSettings {
+  hourlyTarget: number;
+  weeklyProfitTarget: number;
+  incomeTaxReservePercent: number;
+  longDayHours: number;
+  minimumRestHours: number;
 }
 
 export interface TaxAdjustment {

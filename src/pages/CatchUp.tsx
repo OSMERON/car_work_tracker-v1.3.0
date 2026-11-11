@@ -4,6 +4,7 @@ import { Field, PageHeader, money, number } from "../components/Ui";
 import { useData } from "../store/DataContext";
 import { addDays, formatDate, mondayOf, todayIso } from "../lib/date";
 import { tariffForMiles } from "../lib/rates";
+import { jobMiles } from "../lib/analytics";
 import type { Expense, Job } from "../types";
 
 type ExpenseRow = { category: string; actual: string; claimed: string; receipt: boolean };
@@ -25,7 +26,7 @@ export function CatchUp() {
   const weekEnd = addDays(weekStart, 6);
   const weekComplete = (data.completedWeeks ?? []).includes(weekStart);
   const weekJobs = useMemo(() => data.jobs.filter(job => job.status === "delivered" && job.weekStart === weekStart).sort((a,b) => a.deliveryDate.localeCompare(b.deliveryDate)), [data.jobs, weekStart]);
-  const weekMiles = weekJobs.reduce((sum, job) => sum + (job.actualMiles ?? job.estimatedMiles ?? 0), 0);
+  const weekMiles = weekJobs.reduce((sum, job) => sum + jobMiles(job), 0);
 
   const toggleWeekComplete = () => {
     setError("");
@@ -55,7 +56,7 @@ export function CatchUp() {
       pickupPostcode: form.pickupPostcode.toUpperCase().replace(/\s/g, ""), deliveryTown: form.deliveryTown,
       deliveryPostcode: form.deliveryPostcode.toUpperCase().replace(/\s/g, ""),
       odometerStart: duplicate?.odometerStart ?? null, odometerEnd: duplicate?.odometerEnd ?? null,
-      estimatedMiles: duplicate?.estimatedMiles ?? miles, actualMiles: miles, payslipMiles: duplicate?.payslipMiles ?? null,
+      estimatedMiles: duplicate?.estimatedMiles ?? miles, actualMiles: duplicate?.actualMiles ?? null, payslipMiles: duplicate?.payslipMiles ?? null,
       waitingEstimated: form.waiting ? Number(form.waiting) : 0, waitingPaid: duplicate?.waitingPaid ?? null,
       tariffPaid: duplicate?.tariffPaid ?? null, firstDeliveryBefore9: form.before9,
       deliveryOrder: duplicate?.deliveryOrder ?? null, weekStart,
@@ -92,7 +93,7 @@ export function CatchUp() {
           <Field label={language === "ro" ? "Postcode pickup" : "Pickup postcode"}><input value={form.pickupPostcode} onChange={event => set("pickupPostcode", event.target.value)}/></Field>
           <Field label={language === "ro" ? "Oraș livrare *" : "Delivery town *"}><input value={form.deliveryTown} onChange={event => set("deliveryTown", event.target.value)} required/></Field>
           <Field label={language === "ro" ? "Postcode livrare" : "Delivery postcode"}><input value={form.deliveryPostcode} onChange={event => set("deliveryPostcode", event.target.value)}/></Field>
-          <Field label={language === "ro" ? "Mile efective" : "Actual miles"}><input type="number" min="0" step="0.1" value={form.actualMiles} onChange={event => set("actualMiles", event.target.value)}/></Field>
+          <Field label={language === "ro" ? "Mile colectare - livrare" : "Collection to delivery miles"}><input type="number" min="0" step="0.1" value={form.actualMiles} onChange={event => set("actualMiles", event.target.value)}/></Field>
           <Field label={language === "ro" ? "Ora livrării" : "Delivery time"}><input type="time" value={form.deliveryTime} onChange={event => set("deliveryTime", event.target.value)}/></Field>
           <Field label={language === "ro" ? "Waiting time £" : "Waiting time £"}><input type="number" min="0" step="0.01" value={form.waiting} onChange={event => set("waiting", event.target.value)}/></Field>
           <Field label={language === "ro" ? "Prima livrare înainte de 09:00" : "First delivery before 09:00"}><label className="check"><input type="checkbox" checked={form.before9} onChange={event => set("before9", event.target.checked)}/><span>{language === "ro" ? "Da" : "Yes"}</span></label></Field>
@@ -111,7 +112,7 @@ export function CatchUp() {
         {error && <p className="error-message">{error}</p>}{message && <p className="success-message">{message}</p>}
         <div className="form-actions"><button className="primary-button" type="submit"><ListPlus size={18}/>{language === "ro" ? "Salvează jobul terminat" : "Save completed job"}</button></div>
       </form>
-      <aside className="catch-up-summary"><h2>{language === "ro" ? "Joburile săptămânii" : "Week jobs"}</h2><div className="catch-up-totals"><strong>{weekJobs.length}</strong><span>{language === "ro" ? "joburi" : "jobs"}</span><strong>{number(weekMiles)}</strong><span>{language === "ro" ? "mile" : "miles"}</span></div>{weekJobs.length === 0 ? <p>{language === "ro" ? "Nu ai introdus încă niciun job pentru această săptămână." : "No jobs entered for this week yet."}</p> : <div className="mini-job-list">{weekJobs.map(job => <div key={job.id}><span><strong>{job.jobRef}</strong><small>{job.pickupTown} → {job.deliveryTown}</small></span><span>{number(job.actualMiles ?? job.estimatedMiles ?? 0)} mi<button type="button" onClick={() => { if (confirm(language === "ro" ? `Ștergi jobul ${job.jobRef}?` : `Delete job ${job.jobRef}?`)) { removeJob(job.id); setWeekComplete(weekStart, false); } }}><Trash2 size={15}/></button></span></div>)}</div>}</aside>
+      <aside className="catch-up-summary"><h2>{language === "ro" ? "Joburile săptămânii" : "Week jobs"}</h2><div className="catch-up-totals"><strong>{weekJobs.length}</strong><span>{language === "ro" ? "joburi" : "jobs"}</span><strong>{number(weekMiles)}</strong><span>{language === "ro" ? "mile" : "miles"}</span></div>{weekJobs.length === 0 ? <p>{language === "ro" ? "Nu ai introdus încă niciun job pentru această săptămână." : "No jobs entered for this week yet."}</p> : <div className="mini-job-list">{weekJobs.map(job => <div key={job.id}><span><strong>{job.jobRef}</strong><small>{job.pickupTown} → {job.deliveryTown}</small></span><span>{number(jobMiles(job))} mi<button type="button" onClick={() => { if (confirm(language === "ro" ? `Ștergi jobul ${job.jobRef}?` : `Delete job ${job.jobRef}?`)) { removeJob(job.id); setWeekComplete(weekStart, false); } }}><Trash2 size={15}/></button></span></div>)}</div>}</aside>
     </div>
   </>;
 }

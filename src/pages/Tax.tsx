@@ -8,12 +8,11 @@ import type { TaxAdjustmentType, TaxSettings } from "../types";
 const defaultSettings: TaxSettings = {
   businessName: "",
   vatNumber: "",
-  scheme: "flat-rate",
-  flatRatePercent: null,
+  scheme: "standard",
   salesVatRate: 20,
-  accountingBasis: "cash",
-  vatIncomeTreatment: "unknown",
-  reimbursementVatTreatment: "unknown"
+  accountingBasis: "invoice",
+  vatIncomeTreatment: "vat-inclusive",
+  reimbursementVatTreatment: "taxable-recharge"
 };
 
 const previousQuarter = () => {
@@ -90,18 +89,16 @@ export function TaxPage() {
       totalValueGoodsSuppliedExVAT: Math.round(draft.boxes[8]),
       totalAcquisitionsExVAT: Math.round(draft.boxes[9]),
       finalised: false,
-      calculation: { servicesFromPdfs: draft.servicesFromPdfs, reimbursementsFromPdfs: draft.reimbursementsFromPdfs, flatRateTurnover: draft.flatRateTurnover, flatRatePercent: settings.flatRatePercent }
+      calculation: { scheme: "standard-vat", basis: settings.accountingBasis, servicesFromPdfs: draft.servicesFromPdfs, reimbursementsFromPdfs: draft.reimbursementsFromPdfs, taxableGross: draft.taxableGross, outputVat: draft.outputVat, salesExVat: draft.salesExVat, purchasesExVat: draft.purchasesExVat }
     };
     download(`vat-draft-${period.start}-${period.end}.json`, JSON.stringify(payload, null, 2), "application/json");
   };
 
   const blockerText: Record<string, string> = language === "ro" ? {
-    flatRatePercent: "Completează procentul efectiv Flat Rate.",
     vatIncomeTreatment: "Confirmă dacă sumele RAS includ VAT.",
     reimbursementVatTreatment: "Confirmă tratamentul VAT al rambursărilor.",
     noPayslips: "Nu există PDF-uri în perioada selectată."
   } : {
-    flatRatePercent: "Enter the effective Flat Rate percentage.",
     vatIncomeTreatment: "Confirm whether RAS amounts include VAT.",
     reimbursementVatTreatment: "Confirm the VAT treatment of reimbursements.",
     noPayslips: "No payslip PDFs exist in the selected period."
@@ -119,11 +116,11 @@ export function TaxPage() {
       <div className="form-grid">
         <Field label={language === "ro" ? "Numele afacerii" : "Business name"}><input value={settings.businessName} onChange={event => setSettings(previous => ({ ...previous, businessName: event.target.value }))}/></Field>
         <Field label="VAT number"><input value={settings.vatNumber} onChange={event => setSettings(previous => ({ ...previous, vatNumber: event.target.value }))}/></Field>
-        <Field label={language === "ro" ? "Procent Flat Rate efectiv" : "Effective Flat Rate percentage"}><input type="number" min="0" max="100" step="0.1" value={settings.flatRatePercent ?? ""} onChange={event => setSettings(previous => ({ ...previous, flatRatePercent: event.target.value ? Number(event.target.value) : null }))} placeholder="Exemplu: 10"/></Field>
+        <Field label={language === "ro" ? "Schema VAT" : "VAT scheme"}><input value={language === "ro" ? "Standard VAT" : "Standard VAT"} readOnly/></Field>
         <Field label={language === "ro" ? "Rata VAT pentru sume fără VAT" : "VAT rate for VAT-exclusive amounts"}><input type="number" min="0" max="100" step="0.1" value={settings.salesVatRate} onChange={event => setSettings(previous => ({ ...previous, salesVatRate: Number(event.target.value) || 0 }))}/></Field>
         <Field label={language === "ro" ? "Sumele RAS din PDF" : "RAS PDF amounts"}><select value={settings.vatIncomeTreatment} onChange={event => setSettings(previous => ({ ...previous, vatIncomeTreatment: event.target.value as TaxSettings["vatIncomeTreatment"] }))}><option value="unknown">{language === "ro" ? "Nu este confirmat" : "Not confirmed"}</option><option value="vat-inclusive">{language === "ro" ? "Includ VAT" : "Include VAT"}</option><option value="vat-exclusive">{language === "ro" ? "Nu includ VAT" : "Exclude VAT"}</option></select></Field>
         <Field label={language === "ro" ? "Rambursările pentru tren, taxi și alte costuri" : "Train, taxi and other reimbursements"}><select value={settings.reimbursementVatTreatment} onChange={event => setSettings(previous => ({ ...previous, reimbursementVatTreatment: event.target.value as TaxSettings["reimbursementVatTreatment"] }))}><option value="unknown">{language === "ro" ? "Nu este confirmat" : "Not confirmed"}</option><option value="taxable-recharge">{language === "ro" ? "Costuri refacturate, intră în turnover" : "Taxable recharges, include in turnover"}</option><option value="disbursement">{language === "ro" ? "Disbursements eligibile, exclude" : "Eligible disbursements, exclude"}</option></select></Field>
-        <Field label={language === "ro" ? "Metoda evidenței" : "Accounting basis"}><select value={settings.accountingBasis} onChange={event => setSettings(previous => ({ ...previous, accountingBasis: event.target.value as TaxSettings["accountingBasis"] }))}><option value="cash">{language === "ro" ? "Cash basis, după plăți" : "Cash basis, by payments"}</option><option value="invoice">{language === "ro" ? "Invoice basis, după facturi" : "Invoice basis, by invoices"}</option></select></Field>
+        <Field label={language === "ro" ? "Metoda evidenței" : "Accounting basis"}><select value={settings.accountingBasis} onChange={event => setSettings(previous => ({ ...previous, accountingBasis: event.target.value as TaxSettings["accountingBasis"] }))}><option value="invoice">{language === "ro" ? "Accrual, Standard VAT" : "Accrual, Standard VAT"}</option><option value="cash">{language === "ro" ? "Cash Accounting, Standard VAT" : "Cash Accounting, Standard VAT"}</option></select></Field>
       </div>
       <button className="primary-button" type="button" onClick={saveSettings}>{language === "ro" ? "Salvează setările fiscale" : "Save tax settings"}</button>
       {message && <p className="success-message">{message}</p>}
@@ -131,12 +128,12 @@ export function TaxPage() {
 
     {draft.blockers.length > 0 && <div className="tax-blockers"><AlertTriangle/><div><strong>{language === "ro" ? "Date lipsă" : "Missing information"}</strong>{draft.blockers.map(item => <p key={item}>{blockerText[item]}</p>)}</div></div>}
 
-    <section className="tax-source-grid"><div><span>{language === "ro" ? "Servicii din PDF-uri" : "Services from PDFs"}</span><strong>{money(draft.servicesFromPdfs)}</strong></div><div><span>{language === "ro" ? "Rambursări din PDF-uri" : "Reimbursements from PDFs"}</span><strong>{money(draft.reimbursementsFromPdfs)}</strong></div><div><span>{language === "ro" ? "Turnover Flat Rate" : "Flat Rate turnover"}</span><strong>{money(draft.flatRateTurnover)}</strong></div><div><span>{language === "ro" ? "Procent aplicat" : "Applied percentage"}</span><strong>{settings.flatRatePercent ?? "?"}%</strong></div></section>
+    <section className="tax-source-grid"><div><span>{language === "ro" ? "Servicii din PDF-uri" : "Services from PDFs"}</span><strong>{money(draft.servicesFromPdfs)}</strong></div><div><span>{language === "ro" ? "Rambursări din PDF-uri" : "Reimbursements from PDFs"}</span><strong>{money(draft.reimbursementsFromPdfs)}</strong></div><div><span>{language === "ro" ? "Total cu VAT inclus" : "VAT-inclusive total"}</span><strong>{money(draft.taxableGross)}</strong></div><div><span>{language === "ro" ? "VAT extras la 20%" : "VAT extracted at 20%"}</span><strong>{money(draft.outputVat)}</strong></div></section>
 
     <section className="vat-return-card">
       <div className="vat-return-heading"><div><span className="eyebrow">2</span><h2>{language === "ro" ? "Declarație VAT UK, cele 9 casete" : "UK VAT Return, nine boxes"}</h2><p>{period.start} to {period.end}</p></div><Calculator/></div>
       <div className="vat-group-title">{language === "ro" ? "VAT ÎN ACEASTĂ PERIOADĂ" : "VAT IN THIS PERIOD"}</div>
-      <VatBox box={1} label={language === "ro" ? "VAT datorat pentru vânzări și alte outputs" : "VAT due on sales and other outputs"} value={draft.boxes[1]} explanation={language === "ro" ? `${money(draft.flatRateTurnover)} × ${settings.flatRatePercent ?? 0}% plus ajustări` : `${money(draft.flatRateTurnover)} × ${settings.flatRatePercent ?? 0}% plus adjustments`}/>
+      <VatBox box={1} label={language === "ro" ? "VAT datorat pentru vânzări și alte outputs" : "VAT due on sales and other outputs"} value={draft.boxes[1]} explanation={settings.vatIncomeTreatment === "vat-inclusive" ? `${money(draft.taxableGross)} × ${settings.salesVatRate}/${100 + settings.salesVatRate}` : `${money(draft.salesExVat)} × ${settings.salesVatRate}%`}/>
       <VatBox box={2} label={language === "ro" ? "VAT datorat pentru achiziții de bunuri în Northern Ireland din state UE" : "VAT due on acquisitions of goods in Northern Ireland from EU member states"} value={draft.boxes[2]}/>
       <VatBox box={3} label={language === "ro" ? "Total VAT datorat" : "Total VAT due"} value={draft.boxes[3]} calculated/>
       <VatBox box={4} label={language === "ro" ? "VAT recuperat pentru purchases și alte inputs" : "VAT reclaimed on purchases and other inputs"} value={draft.boxes[4]}/>
@@ -158,7 +155,7 @@ export function TaxPage() {
 
     <section className="income-tax-card"><div className="section-title"><div><span className="eyebrow">MTD INCOME TAX</span><h2>{language === "ro" ? "Sumar automat pentru self-employment" : "Automatic self-employment summary"}</h2></div><FileText/></div><div className="income-periods"><IncomeSummary title={language === "ro" ? "Perioada selectată" : "Selected period"} summary={income}/><IncomeSummary title={language === "ro" ? `An fiscal până la ${period.end}` : `Tax year to ${period.end}`} summary={ytd}/></div><p>{language === "ro" ? "Actualizarea trimestrială MTD Income Tax este un sumar al veniturilor și cheltuielilor. Nu este calculul final al taxei." : "An MTD Income Tax quarterly update is a summary of income and expenses. It is not the final tax calculation."}</p></section>
 
-    <div className="official-guidance"><ExternalLink/><div><strong>{language === "ro" ? "Surse oficiale UK" : "Official UK sources"}</strong><p><a href="https://www.gov.uk/guidance/how-to-fill-in-and-submit-your-vat-return-vat-notice-70012" target="_blank" rel="noreferrer">VAT Notice 700/12</a> · <a href="https://www.gov.uk/guidance/flat-rate-scheme-for-small-businesses-vat-notice-733--2" target="_blank" rel="noreferrer">VAT Notice 733</a> · <a href="https://www.gov.uk/guidance/use-making-tax-digital-for-income-tax/send-quarterly-updates" target="_blank" rel="noreferrer">MTD Income Tax</a></p></div></div>
+    <div className="official-guidance"><ExternalLink/><div><strong>{language === "ro" ? "Surse oficiale UK" : "Official UK sources"}</strong><p><a href="https://www.gov.uk/guidance/how-to-fill-in-and-submit-your-vat-return-vat-notice-70012" target="_blank" rel="noreferrer">VAT Notice 700/12</a> · <a href="https://www.gov.uk/charge-reclaim-record-vat" target="_blank" rel="noreferrer">Standard VAT</a> · <a href="https://www.gov.uk/guidance/use-making-tax-digital-for-income-tax/send-quarterly-updates" target="_blank" rel="noreferrer">MTD Income Tax</a></p></div></div>
   </>;
 }
 
@@ -167,5 +164,5 @@ function VatBox({ box, label, value, explanation, calculated = false }: { box: n
 }
 
 function IncomeSummary({ title, summary }: { title: string; summary: ReturnType<typeof calculateIncomeTaxSummary> }) {
-  return <article><h3>{title}</h3><div><span>Gross receipts</span><strong>{money(summary.grossReceipts)}</strong></div><div><span>Flat Rate VAT</span><strong>{money(summary.flatRateVat)}</strong></div><div><span>Turnover for accounts</span><strong>{money(summary.turnoverForAccounts)}</strong></div><div><span>Business expenses</span><strong>{money(summary.expenses)}</strong></div><div className="income-profit"><span>Estimated profit</span><strong>{money(summary.estimatedProfit)}</strong></div></article>;
+  return <article><h3>{title}</h3><div><span>Gross receipts</span><strong>{money(summary.grossReceipts)}</strong></div><div><span>Standard VAT</span><strong>{money(summary.outputVat)}</strong></div><div><span>Turnover for accounts</span><strong>{money(summary.turnoverForAccounts)}</strong></div><div><span>Business expenses</span><strong>{money(summary.expenses)}</strong></div><div className="income-profit"><span>Estimated profit</span><strong>{money(summary.estimatedProfit)}</strong></div></article>;
 }
