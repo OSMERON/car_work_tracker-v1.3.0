@@ -40,7 +40,9 @@ export const uploadAll = async (client: SupabaseClient, data: AppData) => {
     completedWeeks: data.completedWeeks ?? [],
     taxSettings: data.taxSettings,
     taxAdjustments: data.taxAdjustments ?? [],
-    confirmedTaxPeriods: data.confirmedTaxPeriods ?? []
+    confirmedTaxPeriods: data.confirmedTaxPeriods ?? [],
+    dailyLogs: data.dailyLogs ?? [],
+    performanceSettings: data.performanceSettings
   }]);
 };
 
@@ -62,6 +64,8 @@ export const downloadAll = async (client: SupabaseClient): Promise<AppData> => {
     completedWeeks,
     taxSettings: appSettings.taxSettings,
     taxAdjustments: appSettings.taxAdjustments ?? [],
-    confirmedTaxPeriods: appSettings.confirmedTaxPeriods ?? []
+    confirmedTaxPeriods: appSettings.confirmedTaxPeriods ?? [],
+    dailyLogs: appSettings.dailyLogs ?? [],
+    performanceSettings: appSettings.performanceSettings
   } as AppData;
 };
