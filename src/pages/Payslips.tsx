@@ -7,7 +7,7 @@ import { tFor } from "../i18n";
 import { addDays, formatDate, mondayOf } from "../lib/date";
 import { jobMiles } from "../lib/analytics";
 import { tariffForMiles } from "../lib/rates";
-import { extractPdfText, parsePayslipText } from "../lib/payslipPdf";
+import { extractPdfText, hashPdfFile, parsePayslipText } from "../lib/payslipPdf";
 import { deletePayslipPdf, getPayslipPdf, savePayslipPdf } from "../lib/pdfStore";
 import type { Payslip } from "../types";
 
@@ -24,17 +24,43 @@ export function PayslipsPage() {
   const payslips = useMemo(() => [...data.payslips].sort((a,b) => b.weekStart.localeCompare(a.weekStart)), [data.payslips]);
   const selectedPayslip = payslips.find(payslip => payslip.id === selected) ?? payslips[0];
 
-  const upload = async (file?: File) => {
-    if (!file) return;
+  const upload = async (fileList: FileList | null) => {
+    const files = [...(fileList ?? [])];
+    if (!files.length) return;
     setBusy(true); setError(""); setNotice("");
+    const knownHashes = new Set(data.payslips.map(payslip => payslip.fileHash).filter((value): value is string => Boolean(value)));
+    const knownWeeks = new Set(data.payslips.map(payslip => payslip.weekStart));
+    let imported = 0;
+    let duplicates = 0;
+    let importedCars = 0;
+    let importedMiles = 0;
+    const failures: string[] = [];
+    let lastId = "";
     try {
-      const text = await extractPdfText(file);
-      const parsed = parsePayslipText(text, file.name);
-      await savePayslipPdf(parsed.id, file);
-      savePayslip(parsed);
-      setSelected(parsed.id);
-      const importedMiles = (parsed.pdfJobs ?? []).reduce((total, row) => total + row.miles, 0);
-      setNotice(language === "ro" ? `PDF verificat. Am găsit ${parsed.pdfJobs?.length ?? 0} mașini, ${number(importedMiles)} mile și ${parsed.pdfExpenses?.length ?? 0} cheltuieli. Raportul complet apare mai jos.` : `PDF checked. Found ${parsed.pdfJobs?.length ?? 0} cars, ${number(importedMiles)} miles and ${parsed.pdfExpenses?.length ?? 0} expenses. The full report appears below.`);
+      for (const file of files) {
+        try {
+          const fileHash = await hashPdfFile(file);
+          if (knownHashes.has(fileHash)) { duplicates += 1; continue; }
+          const text = await extractPdfText(file);
+          const parsed = { ...parsePayslipText(text, file.name), fileHash };
+          if (knownWeeks.has(parsed.weekStart)) { duplicates += 1; continue; }
+          await savePayslipPdf(parsed.id, file);
+          savePayslip(parsed);
+          knownHashes.add(fileHash);
+          knownWeeks.add(parsed.weekStart);
+          imported += 1;
+          importedCars += parsed.pdfJobs?.length ?? 0;
+          importedMiles += (parsed.pdfJobs ?? []).reduce((total, row) => total + row.miles, 0);
+          lastId = parsed.id;
+        } catch (uploadError) {
+          failures.push(`${file.name}: ${uploadError instanceof Error ? uploadError.message : String(uploadError)}`);
+        }
+      }
+      if (lastId) setSelected(lastId);
+      if (imported || duplicates) setNotice(language === "ro"
+        ? `${imported} PDF-uri importate, ${duplicates} duplicate blocate. Am găsit ${importedCars} mașini și ${number(importedMiles)} mile.`
+        : `${imported} PDFs imported, ${duplicates} duplicates blocked. Found ${importedCars} cars and ${number(importedMiles)} miles.`);
+      if (failures.length) setError(failures.join(" | "));
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : String(uploadError));
     } finally { setBusy(false); }
@@ -56,7 +82,7 @@ export function PayslipsPage() {
   };
 
   return <>
-    <PageHeader title={language === "ro" ? "Verificare fluturași" : "Payslip checker"} subtitle={language === "ro" ? "Încarcă PDF-ul. Comparația personală pornește numai după ce confirmi că săptămâna este completă." : "Upload the PDF. Personal comparison starts only after you confirm the week is complete."} action={<label className="primary-button upload-button"><FileUp size={18}/>{busy ? (language === "ro" ? "Se citește…" : "Reading…") : (language === "ro" ? "Încarcă PDF" : "Upload PDF")}<input type="file" accept="application/pdf" onChange={event => upload(event.target.files?.[0])}/></label>}/>
+    <PageHeader title={language === "ro" ? "Verificare fluturași" : "Payslip checker"} subtitle={language === "ro" ? "Selectează unul sau mai multe PDF-uri. Fișierele și săptămânile duplicate sunt blocate automat." : "Select one or more PDFs. Duplicate files and weeks are blocked automatically."} action={<label className="primary-button upload-button"><FileUp size={18}/>{busy ? (language === "ro" ? "Se citesc…" : "Reading…") : (language === "ro" ? "Încarcă PDF-uri" : "Upload PDFs")}<input type="file" accept="application/pdf" multiple onChange={event => { void upload(event.target.files); event.currentTarget.value = ""; }}/></label>}/>
     {error && <div className="alert red"><AlertTriangle/>{error}</div>}
     {notice && <div className="alert green"><CheckCircle2/>{notice}<span className="alert-links"><Link to="/reports">{language === "ro" ? "Vezi rapoartele" : "View reports"}</Link><Link to="/tax">{language === "ro" ? "Vezi VAT" : "View VAT"}</Link></span></div>}
     <div className="notice-card"><ShieldCheck/><div><strong>{language === "ro" ? "Control transparent al plății" : "Transparent payment check"}</strong><p>{language === "ro" ? "Săptămânile incomplete nu afișează pierderi. Confirmă săptămâna după ce ai introdus toate Job Ref-urile." : "Incomplete weeks do not show losses. Confirm the week after entering every Job Ref."}</p></div></div>

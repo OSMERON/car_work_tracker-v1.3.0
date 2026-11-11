@@ -1,4 +1,4 @@
-# A.R.I.S. v1.4.2
+# A.R.I.S. v1.4.3
 
 ## Ce primești
 
@@ -20,6 +20,12 @@
 - separarea milelor plătibile de distanța reală condusă
 - raport imediat după încărcarea PDF-ului, cu toate mașinile, milele și plățile
 - detectarea Job Ref-urilor duplicate și a informațiilor lipsă din PDF
+- interfață A.R.I.S. HUD refăcută, cu reactor, telemetrie, scanări și culori high-tech
+- trei totaluri separate: date introduse manual, date extrase din PDF și total combinat
+- combinare după Job Ref, fără dublarea aceleiași mașini
+- prioritate pentru milele și plata finală din PDF
+- încărcare simultană pentru mai multe PDF-uri
+- blocarea unui PDF identic și a unei săptămâni deja importate
 
 ## Date necesare pentru rezultate bune
 
@@ -73,7 +79,7 @@ Pentru taxe:
 2. Extrage fișierele.
 3. Înlocuiește fișierele din repository cu cele din arhivă.
 4. Nu încărca folderul node_modules.
-5. Fă un commit cu mesajul `A.R.I.S. v1.4.2`.
+5. Fă un commit cu mesajul `A.R.I.S. v1.4.3 Jarvis HUD`.
 6. Trimite schimbările pe branch-ul main.
 7. GitHub Actions reconstruiește și publică aplicația.
 

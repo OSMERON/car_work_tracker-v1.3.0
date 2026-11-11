@@ -12,6 +12,12 @@ const isoDate = (value: string) => {
 };
 const compact = (value: string) => value.replace(/\s+/g, " ").trim();
 
+export const hashPdfFile = async (file: File) => {
+  const bytes = await file.arrayBuffer();
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, "0")).join("");
+};
+
 export const extractPdfText = async (file: File) => {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/legacy/build/pdf.worker.mjs", import.meta.url).toString();

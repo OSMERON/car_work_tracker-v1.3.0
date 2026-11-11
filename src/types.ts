@@ -55,6 +55,7 @@ export interface Expense {
 
 export interface Payslip {
   id: string;
+  fileHash?: string;
   weekStart: string;
   deliveriesReported: number;
   onTimeReported: number | null;

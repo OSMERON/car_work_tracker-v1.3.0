@@ -2,9 +2,11 @@ import { Activity, AlertTriangle, BarChart3, CalendarDays, CheckCircle2, Clock3,
 import { useMemo, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { money, number } from "../components/Ui";
+import { SourceMatrix } from "../components/SourceMatrix";
 import { useData } from "../store/DataContext";
 import { addDays, formatDate, formatShortDate, mondayOf, todayIso } from "../lib/date";
 import { performanceRecords, performanceSnapshot, routePerformance, weekdayPerformance } from "../lib/performance";
+import { calculateSourceTotals } from "../lib/sourceTotals";
 import type { DailyLog, DayWorkStatus } from "../types";
 
 type View = "command" | "performance" | "week";
@@ -31,6 +33,7 @@ export function PerformancePage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const end = addDays(weekStart, 6);
   const snapshot = useMemo(() => performanceSnapshot(data, weekStart, end), [data, weekStart, end]);
+  const sourceTotals = useMemo(() => calculateSourceTotals(data, weekStart, end), [data, weekStart, end]);
   const previous = useMemo(() => performanceSnapshot(data, addDays(weekStart, -7), addDays(weekStart, -1)), [data, weekStart]);
   const rangeStart = analysisRange === "week" ? weekStart : analysisRange === "30" ? addDays(end, -29) : analysisRange === "all" ? "2000-01-01" : addDays(end, -89);
   const rangeSnapshot = useMemo(() => performanceSnapshot(data, rangeStart, end), [data, rangeStart, end]);
@@ -89,6 +92,7 @@ export function PerformancePage() {
     </nav>
 
     {view === "command" && <>
+      <SourceMatrix totals={sourceTotals} compact/>
       <section className="aris-kpi-grid">
         <ArisKpi label={language === "ro" ? "Câștig real pe oră" : "True hourly earnings"} value={snapshot.awayMinutes ? `${money(snapshot.realHourly)}/h` : "Adaugă orele"} detail={`${language === "ro" ? "Obiectiv" : "Target"} ${money(settings.hourlyTarget)}`} progress={snapshot.awayMinutes ? snapshot.realHourly / settings.hourlyTarget * 100 : 0}/>
         <ArisKpi label={language === "ro" ? "Profit real săptămânal" : "Real weekly profit"} value={money(snapshot.realProfit)} detail={`${language === "ro" ? "Țintă" : "Target"} ${money(settings.weeklyProfitTarget)}`} progress={snapshot.realProfit / settings.weeklyProfitTarget * 100}/>
