@@ -1,4 +1,4 @@
-A.R.I.S. 1.5.3
+A.R.I.S. 1.5.4
 
 1. Deschide ZIP-ul.
 2. Copiaza toate folderele si fisierele peste proiectul tau.
@@ -7,16 +7,16 @@ A.R.I.S. 1.5.3
 5. Ruleaza: npm install
 6. Ruleaza: npm run build
 7. Ruleaza: git add .
-8. Ruleaza: git commit -m "ARIS v1.5.3 intelligence and company fuel"
+8. Ruleaza: git commit -m "ARIS v1.5.4 charts only intelligence"
 9. Ruleaza: git push
 10. Asteapta marcajul verde din GitHub Actions.
 11. Deschide aplicatia si apasa Ctrl+F5 o singura data.
 
 Schimbari principale:
-- A.R.I.S. Intelligence are pagina separata, filtre si grafice proprii.
-- Butonul central de pe telefon deschide A.R.I.S.
-- Meniul contine acces vizibil la A.R.I.S. Intelligence.
-- Combustibilul din PDF este marcat drept card companie.
-- Combustibilul nu intra in rambursari, costuri personale, profit sau taxe.
-- A.R.I.S. arata combustibilul pe masina, media pe masina si costul pe mila.
-- A.R.I.S. compara ora plecarii de acasa cu ora primului job.
+- A.R.I.S. Intelligence nu mai foloseste structura paginii Acasa.
+- Pagina contine numai introducerea orelor, calcule si grafice.
+- La deschidere intreaba la ce ora ai inceput munca.
+- Ora de sfarsit este optionala. Pentru ziua curenta calculul merge pana la ora actuala.
+- Waiting este venit platit catre tine si intra in venitul zilnic si castigul pe ora.
+- Combustibilul ramane informativ, platit cu cardul companiei.
+- Grafice pentru venit, waiting, castig pe ora, ora inceperii, combustibil, masini, mile, costuri, surse si rute.

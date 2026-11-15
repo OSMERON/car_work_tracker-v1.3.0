@@ -29,7 +29,7 @@ export const calculateSourceTotals = (data: AppData, start: string, end: string)
   const manual = finish({
     jobs: manualJobs.length,
     miles: round(manualJobs.reduce((sum, job) => sum + (job.estimatedMiles ?? 0), 0)),
-    income: round(manualJobs.reduce((sum, job) => sum + tariffForMiles(job.estimatedMiles) + (job.waitingEstimated ?? 0), 0)),
+    income: round(manualJobs.reduce((sum, job) => sum + tariffForMiles(job.estimatedMiles) + (job.waitingPaid ?? job.waitingEstimated ?? 0), 0)),
     costs: round(manualCosts)
   });
 
@@ -62,7 +62,7 @@ export const calculateSourceTotals = (data: AppData, start: string, end: string)
   const combinedJobs = new Set([...manualRefs, ...pdfRefs]);
   const combinedMiles = [...pdfJobs.values()].reduce((sum, job) => sum + job.miles, 0)
     + unmatchedManualJobs.reduce((sum, job) => sum + (job.estimatedMiles ?? 0), 0);
-  const unmatchedManualIncome = unmatchedManualJobs.reduce((sum, job) => sum + tariffForMiles(job.estimatedMiles) + (job.waitingEstimated ?? 0), 0);
+  const unmatchedManualIncome = unmatchedManualJobs.reduce((sum, job) => sum + tariffForMiles(job.estimatedMiles) + (job.waitingPaid ?? job.waitingEstimated ?? 0), 0);
   const manualExpenseKeys = new Set(manualExpenses.map(expense => [expense.date, key(expense.jobRef), expense.actualCost.toFixed(2)].join("|")));
   const unmatchedPdfCosts = [...pdfExpenses.values()]
     .filter(expense => !manualExpenseKeys.has([expense.date, key(expense.jobRef), expense.uploaded.toFixed(2)].join("|")))
