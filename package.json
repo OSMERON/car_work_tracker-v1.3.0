@@ -1,7 +1,7 @@
 {
   "name": "car-work-tracker",
   "private": true,
-  "version": "1.5.4",
+  "version": "1.5.5",
   "type": "module",
   "scripts": {
     "prepare:ocr": "node scripts/copy-ocr-assets.mjs",

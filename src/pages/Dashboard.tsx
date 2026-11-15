@@ -67,7 +67,7 @@ export function Dashboard(){
         <Link to="/payslips"><FileScan/><span><strong>Verifică PDF</strong><small>Compară plata job cu job</small></span><ArrowRight/></Link>
         <Link to="/reports"><CalendarRange/><span><strong>{t("reports")}</strong><small>Zi, săptămână și lună</small></span><ArrowRight/></Link>
         <Link to="/tax"><ReceiptPoundSterling/><span><strong>{t("tax")}</strong><small>VAT și Income Tax</small></span><ArrowRight/></Link>
-        <Link to="/insights"><BrainCircuit/><span><strong>A.R.I.S. Intelligence</strong><small>{language === "ro" ? "Grafice, diferențe și alerte" : "Charts, differences and alerts"}</small></span><ArrowRight/></Link>
+        <Link to="/intelligence"><BrainCircuit/><span><strong>A.R.I.S. Intelligence</strong><small>{language === "ro" ? "Panou separat, numai grafice și calcule" : "Separate panel with charts and calculations only"}</small></span><ArrowRight/></Link>
       </div>
     </section>
 

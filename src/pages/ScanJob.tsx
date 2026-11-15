@@ -37,9 +37,12 @@ export function ScanJobPage() {
   const requiredMissing = !draft.jobRef || !draft.deliveryDate || !draft.collectionDate || (routeRequired && (!draft.pickupPostcode || !draft.deliveryPostcode));
 
   const addFiles = async (event: ChangeEvent<HTMLInputElement>) => {
-    const selected = [...(event.target.files ?? [])].filter(file => file.type.startsWith("image/"));
+    const selected = [...(event.target.files ?? [])].filter(file => !file.type || file.type.startsWith("image/") || /\.(?:png|jpe?g|webp|gif|bmp|heic|heif)$/i.test(file.name));
     event.target.value = "";
-    if (!selected.length) return;
+    if (!selected.length) {
+      setMessage(language === "ro" ? "Fișierul ales nu este recunoscut ca imagine. Folosește PNG, JPG, JPEG sau WEBP." : "The selected file is not recognised as an image. Use PNG, JPG, JPEG or WEBP.");
+      return;
+    }
     const nextFiles = [...files, ...selected];
     setFiles(nextFiles);
     setPreviews(nextFiles.map(file => URL.createObjectURL(file)));
@@ -135,8 +138,8 @@ export function ScanJobPage() {
     <section className="scan-intro-grid">
       <article className="scan-upload-panel">
         <div className="scan-actions">
-          <label className="primary-button upload-button"><Camera/>{language === "ro" ? "Fă fotografie" : "Take photo"}<input type="file" accept="image/*" capture="environment" onChange={addFiles}/></label>
-          <label className="secondary-button upload-button"><Images/>{language === "ro" ? "Alege din galerie" : "Choose from gallery"}<input type="file" accept="image/*" multiple onChange={addFiles}/></label>
+          <label className="primary-button upload-button"><Camera/>{language === "ro" ? "Fă fotografie" : "Take photo"}<input type="file" accept="image/*,.png,.jpg,.jpeg,.webp" capture="environment" onChange={addFiles}/></label>
+          <label className="secondary-button upload-button"><Images/>{language === "ro" ? "Alege din galerie" : "Choose from gallery"}<input type="file" accept="image/*,.png,.jpg,.jpeg,.webp" multiple onChange={addFiles}/></label>
         </div>
         <p>{language === "ro" ? "Poți adăuga mai multe capturi pentru același job. A.R.I.S. combină informațiile." : "You may add several screenshots for one job. A.R.I.S. merges the information."}</p>
         {!!previews.length && <div className="scan-thumbnails">{previews.map((preview, index) => <figure key={`${preview}-${index}`}><img src={preview} alt="Job screenshot"/><button type="button" onClick={() => removeImage(index)} aria-label={language === "ro" ? "Șterge imaginea" : "Remove image"}><Trash2/></button><figcaption>{index + 1}</figcaption></figure>)}</div>}

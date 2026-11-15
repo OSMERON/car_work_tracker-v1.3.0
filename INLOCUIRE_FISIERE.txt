@@ -1,4 +1,4 @@
-A.R.I.S. 1.5.4
+A.R.I.S. 1.5.5
 
 1. Deschide ZIP-ul.
 2. Copiaza toate folderele si fisierele peste proiectul tau.
@@ -7,16 +7,23 @@ A.R.I.S. 1.5.4
 5. Ruleaza: npm install
 6. Ruleaza: npm run build
 7. Ruleaza: git add .
-8. Ruleaza: git commit -m "ARIS v1.5.4 charts only intelligence"
+8. Ruleaza: git commit -m "ARIS v1.5.5 analysis route and photo upload fix"
 9. Ruleaza: git push
 10. Asteapta marcajul verde din GitHub Actions.
 11. Deschide aplicatia si apasa Ctrl+F5 o singura data.
 
 Schimbari principale:
-- A.R.I.S. Intelligence nu mai foloseste structura paginii Acasa.
+- A.R.I.S. Intelligence foloseste adresa noua #/intelligence.
+- Ruta veche #/insights este redirectionata automat.
+- Pagina nu mai foloseste structura paginii Acasa.
+- Pagina afiseaza clar A.R.I.S. ANALYSIS ONLY v1.5.5.
 - Pagina contine numai introducerea orelor, calcule si grafice.
 - La deschidere intreaba la ce ora ai inceput munca.
 - Ora de sfarsit este optionala. Pentru ziua curenta calculul merge pana la ora actuala.
 - Waiting este venit platit catre tine si intra in venitul zilnic si castigul pe ora.
 - Combustibilul ramane informativ, platit cu cardul companiei.
 - Grafice pentru venit, waiting, castig pe ora, ora inceperii, combustibil, masini, mile, costuri, surse si rute.
+- Cache-ul si vechiul service worker sunt sterse automat.
+- Incarcarea imaginilor accepta si fisiere de telefon fara tip MIME.
+- Compresia imaginilor are metoda alternativa pentru browserele fara createImageBitmap.
+- Meniul contine buton direct Incarca poze job.

@@ -97,7 +97,7 @@ export function InsightsPage() {
   const fuelTotal = fuelData.reduce((sum, row) => sum + row.fuel, 0);
 
   return <div className="intel-only-page">
-    <header className="intel-titlebar"><div><span><BrainCircuit/> A.R.I.S. INTELLIGENCE</span><h1>{language === "ro" ? "Grafice și calcule" : "Charts and calculations"}</h1><p>{language === "ro" ? "Această pagină conține exclusiv analiza datelor tale de lucru." : "This page contains only your work data analysis."}</p></div><BarChart3/></header>
+    <header className="intel-titlebar"><div><span><BrainCircuit/> A.R.I.S. ANALYSIS ONLY · v1.5.5</span><h1>{language === "ro" ? "Panou de analiză" : "Analysis dashboard"}</h1><p>{language === "ro" ? "Numai grafice, calcule și date. Aceasta nu este pagina Acasă." : "Charts, calculations and data only. This is not the Home page."}</p></div><BarChart3/></header>
 
     <form className="intel-start-question" onSubmit={saveWorkTime}>
       <div><Clock3/><span><small>{language === "ro" ? "ÎNREGISTRARE ZILNICĂ" : "DAILY RECORD"}</small><strong>{language === "ro" ? "La ce oră ai început munca?" : "What time did you start work?"}</strong></span></div>

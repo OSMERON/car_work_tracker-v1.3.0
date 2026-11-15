@@ -18,10 +18,7 @@ document.documentElement.dataset.themeMode = initialMode;
 document.documentElement.dataset.theme = initialMode === "auto" ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : initialMode;
 
 ReactDOM.createRoot(document.getElementById("root")!).render(<React.StrictMode><HashRouter><DataProvider><App/></DataProvider></HashRouter></React.StrictMode>);
-if ("serviceWorker" in navigator && import.meta.env.PROD) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" })
-      .then(registration => registration.update())
-      .catch(() => undefined);
-  });
-}
+window.addEventListener("load", () => {
+  if ("serviceWorker" in navigator) void navigator.serviceWorker.getRegistrations().then(items => Promise.all(items.map(item => item.unregister()))).catch(() => undefined);
+  if ("caches" in window) void caches.keys().then(keys => Promise.all(keys.map(key => caches.delete(key)))).catch(() => undefined);
+});
