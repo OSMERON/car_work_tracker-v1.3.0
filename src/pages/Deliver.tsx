@@ -9,6 +9,7 @@ import type { Expense } from "../types";
 import { tariffForMiles } from "../lib/rates";
 import { odometerMiles } from "../lib/analytics";
 import { calculateDirectRouteMiles } from "../lib/routeMiles";
+import { jobRegistrations } from "../lib/jobProtocols";
 
 type Row = { category: string; amount: string; claimed: string; receipt: boolean; notes: string };
 const blank = (): Row => ({ category: "Fuel", amount: "", claimed: "", receipt: false, notes: "" });
@@ -91,7 +92,7 @@ export function Deliver() {
 
   return <><PageHeader eyebrow={language === "ro" ? "Etapa 2 din 2" : "Stage 2 of 2"} title={t("completeDelivery")} subtitle={language === "ro" ? "Milele plătibile folosesc numai ruta directă dintre colectare și livrare." : "Payable miles use only the direct route from pickup to delivery."}/>
     <form className="form-card" onSubmit={submit}>
-      <Field label={t("activeCars")} wide><select value={jobId} onChange={event => { setJobId(event.target.value); setRouteError(""); setRouteInfo(""); set("routeMiles", ""); }}>{active.map(item => <option key={item.id} value={item.id}>{item.registration} · {item.makeModel || item.jobRef} · {item.pickupTown} → {item.deliveryTown}</option>)}</select></Field>
+      <Field label={t("activeCars")} wide><select value={jobId} onChange={event => { setJobId(event.target.value); setRouteError(""); setRouteInfo(""); set("routeMiles", ""); }}>{active.map(item => <option key={item.id} value={item.id}>{jobRegistrations(item, true).join(" / ") || "NO REG"} · {item.makeModel || item.jobRef} · {item.pickupTown || (item.protocol === "autorola" ? "CLASSIFIED" : "?")} → {item.deliveryTown || (item.protocol === "autorola" ? "CLASSIFIED" : "?")}</option>)}</select></Field>
       <div className="form-grid">
         <Field label={t("date")}><input type="date" value={form.date} onChange={event => set("date", event.target.value)} required/></Field>
         <Field label={t("time")}><input type="time" value={form.time} onChange={event => set("time", event.target.value)}/></Field>

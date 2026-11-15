@@ -60,7 +60,7 @@ const parseJobs = (text: string): PayslipJob[] => {
   const body = start >= 0 ? page.slice(start) : page;
   const jobs: PayslipJob[] = [];
   const rowPattern = new RegExp(`(${DATE_SOURCE})\\s+(\\d{5,})\\s+([\\d.]+)\\s+(.{3,150}?)\\s+(?:£\\s*([\\d,]+\\.\\d{2})|([\\d,]+\\.\\d{2})\\s*£)`, "gi");
-  const registrationPattern = /((?:[A-Z]{2}\d{2}[A-Z]{3})(?:\s*\/\s*[A-Z]{2}\d{2}[A-Z]{3})?|\d{4}\s*[A-Z]{3}|[A-Z0-9]{5,8})$/i;
+  const registrationPattern = /([A-Z0-9]{5,8}(?:\s*\/\s*[A-Z0-9]{5,8})?)$/i;
   for (const match of body.matchAll(rowPattern)) {
     const details = compact(match[4]);
     const registrationMatch = details.match(registrationPattern);
@@ -82,13 +82,21 @@ const parseExpenses = (text: string): PayslipExpense[] => {
   const page = pages.find(value => /Uploaded Expenses\s+Payable Expenses/i.test(value)) ?? "";
   const expenses: PayslipExpense[] = [];
   const rowPattern = new RegExp(`(${DATE_SOURCE})\\s+(\\d{5,})\\s+([A-Za-z][A-Za-z ]{0,30}?)\\s+£\\s*([\\d,]+\\.\\d{2})\\s+(?:(?:£\\s*)?([\\d,]+\\.\\d{2})\\s*£|-\\s*£)`, "gi");
-  for (const match of page.matchAll(rowPattern)) {
+  const matches = [...page.matchAll(rowPattern)];
+  for (const [index, match] of matches.entries()) {
+    const rowEnd = (match.index ?? 0) + match[0].length;
+    const nextStart = matches[index + 1]?.index ?? page.length;
+    const tail = compact(page.slice(rowEnd, nextStart).split(/\b(?:Total|Summary|Deliveries)\b/i)[0]).slice(0, 120);
+    const actionMatch = tail.match(/\b(?:ticket|code|receipt|query|check|missing|rejected|awaiting|pending)\b[^£]{0,80}/i);
+    const actionNote = compact(actionMatch?.[0] ?? "");
     expenses.push({
       date: isoDate(match[1]),
       jobRef: match[2],
       description: compact(match[3]),
       uploaded: money(match[4]),
-      payable: money(match[5])
+      payable: money(match[5]),
+      actionNote,
+      needsCheck: Boolean(actionNote)
     });
   }
   return expenses;

@@ -1,6 +1,11 @@
-const CACHE = "car-work-tracker-aris-v1.4.4";
+const CACHE = "car-work-tracker-aris-v1.5.1";
 self.addEventListener("install", event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(["./", "./manifest.webmanifest", "./car-icon.svg"])));
+  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll([
+    "./", "./manifest.webmanifest", "./car-icon.svg", "./ocr/worker.min.js", "./ocr/lang/eng.traineddata.gz",
+    "./ocr/core/tesseract-core-lstm.wasm.js", "./ocr/core/tesseract-core-lstm.wasm",
+    "./ocr/core/tesseract-core-simd-lstm.wasm.js", "./ocr/core/tesseract-core-simd-lstm.wasm",
+    "./ocr/core/tesseract-core-relaxedsimd-lstm.wasm.js", "./ocr/core/tesseract-core-relaxedsimd-lstm.wasm"
+  ])));
   self.skipWaiting();
 });
 self.addEventListener("activate", event => {

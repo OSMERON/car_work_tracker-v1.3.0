@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { Camera } from "lucide-react";
 import { Field, PageHeader } from "../components/Ui";
 import { useData } from "../store/DataContext";
 import { tFor } from "../i18n";
@@ -26,7 +27,7 @@ export function Collect() {
       id: crypto.randomUUID(), jobRef: form.jobRef.trim(), status: "collected",
       collectionDate: form.date, collectionTime: form.time, deliveryDate: "", deliveryTime: "",
       makeModel: form.makeModel, carType: form.carType,
-      registration: form.registration.toUpperCase().replace(/\s/g, ""), payslipRegistration: "",
+      registration: form.registration.toUpperCase().replace(/\s/g, ""), registrations: form.registration ? [form.registration.toUpperCase().replace(/\s/g, "")] : [], payslipRegistration: "",
       customerType: form.customerType, pickupTown: form.pickupTown,
       pickupPostcode: form.pickupPostcode.toUpperCase().replace(/\s/g, ""),
       deliveryTown: form.deliveryTown,
@@ -43,7 +44,7 @@ export function Collect() {
   };
 
   return <>
-    <PageHeader eyebrow={language === "ro" ? "Etapa 1 din 2" : "Stage 1 of 2"} title={t("newCollection")} subtitle={language === "ro" ? "Înregistrează detaliile pe care le știi acum. Le completezi la livrare." : "Record what you know now. Finish the details at delivery."}/>
+    <PageHeader eyebrow={language === "ro" ? "Etapa 1 din 2" : "Stage 1 of 2"} title={t("newCollection")} subtitle={language === "ro" ? "Înregistrează detaliile pe care le știi acum. Le completezi la livrare." : "Record what you know now. Finish the details at delivery."} action={<Link className="primary-button" to="/scan-job"><Camera/>{language === "ro" ? "Importă din poză" : "Import from photo"}</Link>}/>
     <form className="form-card" onSubmit={submit}>
       <div className="form-grid">
         <Field label={t("date")}><input type="date" value={form.date} onChange={event => set("date", event.target.value)} required/></Field>

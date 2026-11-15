@@ -1,4 +1,4 @@
-import { ArrowRight, CalendarDays, CalendarRange, CarFront, CircleDot, FileScan, ListPlus, MapPin, ReceiptPoundSterling, Route, ShieldCheck, Wallet, Zap } from "lucide-react";
+import { ArrowRight, BrainCircuit, CalendarDays, CalendarRange, Camera, CarFront, CircleDot, FileScan, ListPlus, MapPin, ReceiptPoundSterling, Route, ShieldCheck, Wallet, Zap } from "lucide-react";
 import { useMemo, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { Empty, number, StatusPill } from "../components/Ui";
@@ -8,6 +8,8 @@ import { tFor } from "../i18n";
 import { addDays, formatDate, mondayOf, todayIso } from "../lib/date";
 import { jobMiles } from "../lib/analytics";
 import { calculateSourceTotals } from "../lib/sourceTotals";
+import { jobRegistrations } from "../lib/jobProtocols";
+import { ProtocolBadge } from "../components/ProtocolBadge";
 
 type Scope = "week" | "month" | "all";
 
@@ -33,7 +35,7 @@ export function Dashboard(){
       <i className="hud-scanline"/>
       <div className="hud-copy">
         <span className="hud-kicker"><CircleDot/> A.R.I.S. COMMAND INTERFACE</span>
-        <h1>{language === "ro" ? <>Bun venit, <em>Bogdan</em></> : <>Welcome, <em>Bogdan</em></>}</h1>
+        <h1>{language === "ro" ? <>Bun venit, <em>Domnule Bogdan</em></> : <>Welcome, <em>Sir Bogdan</em></>}</h1>
         <p>{language === "ro" ? "Date operaționale, plăți și performanță, într-un singur sistem." : "Operations, payments and performance in one system."}</p>
         <div className="hud-controls">
           <label><CalendarDays/><span>{language === "ro" ? "Data de control" : "Control date"}</span><input type="date" value={date} onChange={event => setDate(event.target.value)}/></label>
@@ -58,18 +60,20 @@ export function Dashboard(){
     <section className="hud-action-deck">
       <div className="source-matrix-head"><div><span>QUICK COMMANDS</span><h2>Acțiuni rapide</h2></div><p>{formatDate(range.start, language)} · {formatDate(range.end, language)}</p></div>
       <div className="hud-actions">
+        <Link to="/scan-job"><Camera/><span><strong>{language === "ro" ? "Scanează un job" : "Scan a job"}</strong><small>{language === "ro" ? "Cameră sau galerie, procesare locală" : "Camera or gallery, local processing"}</small></span><ArrowRight/></Link>
         <Link to="/collect"><CarFront/><span><strong>{t("newCollection")}</strong><small>Înregistrează colectarea</small></span><ArrowRight/></Link>
         <Link to="/deliver"><Route/><span><strong>{t("completeDelivery")}</strong><small>{active} mașini active</small></span><ArrowRight/></Link>
         <Link to="/catch-up"><ListPlus/><span><strong>{t("catchUp")}</strong><small>Recuperează joburile lipsă</small></span><ArrowRight/></Link>
         <Link to="/payslips"><FileScan/><span><strong>Verifică PDF</strong><small>Compară plata job cu job</small></span><ArrowRight/></Link>
         <Link to="/reports"><CalendarRange/><span><strong>{t("reports")}</strong><small>Zi, săptămână și lună</small></span><ArrowRight/></Link>
         <Link to="/tax"><ReceiptPoundSterling/><span><strong>{t("tax")}</strong><small>VAT și Income Tax</small></span><ArrowRight/></Link>
+        <Link to="/insights"><BrainCircuit/><span><strong>A.R.I.S. Intelligence</strong><small>{language === "ro" ? "Grafice, diferențe și alerte" : "Charts, differences and alerts"}</small></span><ArrowRight/></Link>
       </div>
     </section>
 
     <section className="section-block hud-day-panel">
       <div className="section-title"><div><span className="hud-kicker">DAILY OPERATIONS</span><h2>{formatDate(date,language)}</h2><p>{dayJobs.length} {language === "ro" ? "înregistrări" : "records"}</p></div><div className="hud-date-code"><ShieldCheck/> {weekStart}</div></div>
-      {!dayJobs.length ? <Empty>{t("noJobsToday")}</Empty> : <div className="job-list">{dayJobs.map(job => <article className="job-card" key={job.id}><div className="job-main"><span className="reg">{job.registration||"NO REG"}</span><div><h3>{job.makeModel||job.jobRef||"Car"}</h3><p><MapPin size={14}/>{job.pickupTown||"?"} <ArrowRight size={13}/> {job.deliveryTown||"?"}</p></div></div><div className="job-meta"><StatusPill status={job.status}/><strong>{number(jobMiles(job))} mi</strong></div></article>)}</div>}
+      {!dayJobs.length ? <Empty>{t("noJobsToday")}</Empty> : <div className="job-list">{dayJobs.map(job => <article className="job-card" key={job.id}><div className="job-main"><span className="reg">{jobRegistrations(job, true).join(" / ")||"NO REG"}</span><div><h3>{[job.makeModel, job.vehicleYear].filter(Boolean).join(" · ")||job.jobRef||"Car"}</h3><p><MapPin size={14}/>{job.protocol === "autorola" && !job.pickupTown ? (language === "ro" ? "Locație clasificată" : "Classified location") : job.pickupTown||"?"} <ArrowRight size={13}/> {job.protocol === "autorola" && !job.deliveryTown ? (language === "ro" ? "Locație clasificată" : "Classified location") : job.deliveryTown||"?"}</p></div></div><div className="job-meta"><ProtocolBadge protocol={job.protocol} language={language} compact/><StatusPill status={job.status}/><strong>{number(jobMiles(job))} mi</strong></div></article>)}</div>}
     </section>
 
     <Link className="comparison-banner hud-compare" to="/payslips"><Wallet/><div><small>FINANCIAL VERIFY PROTOCOL</small><strong>{t("currentWeekCompare")}</strong><span>{language === "ro" ? "Încarcă PDF-ul. A.R.I.S. verifică mașinile, milele și plata." : "Upload the PDF. A.R.I.S. checks cars, miles and payment."}</span></div><ArrowRight/></Link>

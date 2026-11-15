@@ -1,6 +1,9 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import seed from "../data/seed-data.json";
 import type { AppData, DailyLog, Expense, Job, Language, Payslip, PerformanceSettings, TaxAdjustment, TaxSettings } from "../types";
+import { clearLocalFiles, deleteJobImages } from "../lib/jobImageStore";
+import { jobRegistrations, normalizeRegistration } from "../lib/jobProtocols";
+import { tariffForMiles } from "../lib/rates";
 
 const DATA_KEY = "car-work-tracker-data-v1";
 const LANGUAGE_KEY = "car-work-tracker-language";
@@ -30,9 +33,10 @@ const normalizeJobs = (jobs: Job[]) => {
     let id = job.id || `job-${job.jobRef || index}`;
     if (seen.has(id)) id = `${id}-${job.jobRef || index}`;
     seen.add(id);
-    if (job.pickupTown || job.deliveryTown || !job.makeModel.includes("/")) return { ...job, id };
+    const registrations = jobRegistrations(job);
+    if (job.pickupTown || job.deliveryTown || !job.makeModel.includes("/")) return { ...job, id, registrations };
     const parts = job.makeModel.split("/").map(value => value.replace(/\([^)]*\)/g, "").trim()).filter(Boolean);
-    return { ...job, id, pickupTown: parts[0] ?? "", deliveryTown: parts[1] ?? "" };
+    return { ...job, id, registrations, pickupTown: parts[0] ?? "", deliveryTown: parts[1] ?? "" };
   });
 };
 
@@ -85,7 +89,7 @@ type DataApi = {
   saveTaxAdjustment: (item: TaxAdjustment) => void;
   removeTaxAdjustment: (id: string) => void;
   setTaxPeriodConfirmed: (periodKey: string, confirmed: boolean) => void;
-  replaceData: (next: AppData) => void; restoreSeed: () => void;
+  replaceData: (next: AppData) => void; restoreSeed: () => void; clearAllData: () => Promise<void>;
 };
 
 const DataContext = createContext<DataApi | null>(null);
@@ -97,7 +101,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const setLanguage = (value: Language) => { setLanguageState(value); localStorage.setItem(LANGUAGE_KEY, value); };
   const replaceData = (next: AppData) => setData(normalizeData({ ...next, generatedAt: new Date().toISOString() }));
   const saveJob = (job: Job) => setData(prev => ({ ...prev, jobs: [...prev.jobs.filter(x => x.id !== job.id), job] }));
-  const removeJob = (id: string) => setData(prev => ({ ...prev, jobs: prev.jobs.filter(x => x.id !== id), expenses: prev.expenses.filter(x => x.jobRef !== prev.jobs.find(j => j.id === id)?.jobRef) }));
+  const removeJob = (id: string) => {
+    void deleteJobImages(id);
+    setData(prev => ({ ...prev, jobs: prev.jobs.filter(x => x.id !== id), expenses: prev.expenses.filter(x => x.jobRef !== prev.jobs.find(j => j.id === id)?.jobRef) }));
+  };
   const saveExpenses = (items: Expense[]) => setData(prev => ({ ...prev, expenses: [...prev.expenses.filter(e => !items.some(x => x.id === e.id)), ...items] }));
   const removeExpense = (id: string) => setData(prev => ({ ...prev, expenses: prev.expenses.filter(x => x.id !== id) }));
   const savePayslip = (item: Payslip) => setData(prev => {
@@ -105,9 +112,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const jobs = [...prev.jobs];
     for (const row of item.pdfJobs ?? []) {
       const route = routeFromDescription(row.description);
-      const index = jobs.findIndex(job => job.jobRef === row.jobRef);
+      const rowRegistration = normalizeRegistration(row.registration);
+      const index = jobs.findIndex(job => job.jobRef === row.jobRef || (rowRegistration && jobRegistrations(job, true).includes(rowRegistration)));
       if (index >= 0) {
         const existing = jobs[index];
+        const registrations = [...new Set([...jobRegistrations(existing), rowRegistration].filter(Boolean))];
+        const detectedProtocolExtra = existing.protocol ? Math.max(0, Math.round((row.paid - tariffForMiles(row.miles)) * 100) / 100) : null;
         jobs[index] = {
           ...existing,
           status: "delivered",
@@ -115,11 +125,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
           collectionDate: existing.collectionDate || row.date,
           makeModel: existing.makeModel || row.description,
           registration: existing.registration || row.registration,
+          registrations,
           pickupTown: existing.pickupTown || route.pickupTown,
           deliveryTown: existing.deliveryTown || route.deliveryTown,
           payslipRegistration: row.registration,
           payslipMiles: row.miles,
           tariffPaid: row.paid,
+          protocolExtraDetected: detectedProtocolExtra,
           weekStart: item.weekStart,
           updatedAt: now
         };
@@ -135,6 +147,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           makeModel: row.description,
           carType: "",
           registration: row.registration,
+          registrations: row.registration ? [normalizeRegistration(row.registration)] : [],
           payslipRegistration: row.registration,
           customerType: "",
           pickupTown: route.pickupTown,
@@ -159,7 +172,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         });
       }
     }
-    const manualExpenses = prev.expenses.filter(expense => !(expense.source === "payslip" && expense.weekStart === item.weekStart));
+    const mergedExpenses = prev.expenses.filter(expense => !(expense.source === "payslip" && expense.weekStart === item.weekStart));
+    const matchedManual = new Set<number>();
     const pdfExpenses: Expense[] = (item.pdfExpenses ?? []).map((row, index) => ({
       id: `pdf-expense-${item.weekStart}-${row.jobRef}-${index}`,
       jobRef: row.jobRef,
@@ -174,13 +188,25 @@ export function DataProvider({ children }: { children: ReactNode }) {
       vatAmount: 0,
       vatReclaimable: false,
       includeInTax: row.payable > 0,
-      notes: "Imported from payslip PDF",
-      source: "payslip"
-    }));
+      notes: ["Imported from payslip PDF", row.actionNote].filter(Boolean).join(" · "),
+      source: "payslip" as const
+    })).filter((pdfExpense, pdfIndex) => {
+      const manualIndex = mergedExpenses.findIndex((expense, index) => !matchedManual.has(index) && expense.source === "manual" && expense.date === pdfExpense.date && expense.jobRef === pdfExpense.jobRef && Math.abs(expense.actualCost - pdfExpense.actualCost) < 0.01);
+      if (manualIndex < 0) return true;
+      const existing = mergedExpenses[manualIndex];
+      matchedManual.add(manualIndex);
+      mergedExpenses[manualIndex] = {
+        ...existing,
+        claimed: existing.claimed || pdfExpense.claimed,
+        approved: pdfExpense.approved,
+        notes: [existing.notes, pdfExpense.notes].filter(Boolean).join(" · ")
+      };
+      return false;
+    });
     return {
       ...prev,
       jobs,
-      expenses: [...manualExpenses, ...pdfExpenses],
+      expenses: [...mergedExpenses, ...pdfExpenses],
       payslips: [...prev.payslips.filter(x => x.weekStart !== item.weekStart), item],
       completedWeeks: [...new Set([...(prev.completedWeeks ?? []), item.weekStart])]
     };
@@ -194,7 +220,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const removeTaxAdjustment = (id: string) => setData(prev => ({ ...prev, taxAdjustments: (prev.taxAdjustments ?? []).filter(item => item.id !== id) }));
   const setTaxPeriodConfirmed = (periodKey: string, confirmed: boolean) => setData(prev => ({ ...prev, confirmedTaxPeriods: confirmed ? [...new Set([...(prev.confirmedTaxPeriods ?? []), periodKey])] : (prev.confirmedTaxPeriods ?? []).filter(key => key !== periodKey) }));
   const restoreSeed = () => setData(normalizeData(seed as AppData));
-  const value = useMemo(() => ({ data, language, setLanguage, saveJob, removeJob, saveExpenses, removeExpense, savePayslip, removePayslip, setWeekComplete, saveTaxSettings, saveDailyLog, savePerformanceSettings, saveTaxAdjustment, removeTaxAdjustment, setTaxPeriodConfirmed, replaceData, restoreSeed }), [data, language]);
+  const clearAllData = async () => {
+    await clearLocalFiles().catch(() => undefined);
+    setData(normalizeData({ version: 2, generatedAt: new Date().toISOString(), jobs: [], expenses: [], payslips: [], completedWeeks: [], confirmedTaxPeriods: [], taxAdjustments: [], dailyLogs: [] }));
+  };
+  const value = useMemo(() => ({ data, language, setLanguage, saveJob, removeJob, saveExpenses, removeExpense, savePayslip, removePayslip, setWeekComplete, saveTaxSettings, saveDailyLog, savePerformanceSettings, saveTaxAdjustment, removeTaxAdjustment, setTaxPeriodConfirmed, replaceData, restoreSeed, clearAllData }), [data, language]);
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }
 

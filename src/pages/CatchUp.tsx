@@ -6,6 +6,7 @@ import { addDays, formatDate, mondayOf, todayIso } from "../lib/date";
 import { tariffForMiles } from "../lib/rates";
 import { jobMiles } from "../lib/analytics";
 import type { Expense, Job } from "../types";
+import { parseRegistrationInput } from "../lib/jobProtocols";
 
 type ExpenseRow = { category: string; actual: string; claimed: string; receipt: boolean };
 const blankExpense = (): ExpenseRow => ({ category: "Train", actual: "", claimed: "", receipt: true });
@@ -51,7 +52,7 @@ export function CatchUp() {
       collectionDate: form.collectionDate, collectionTime: duplicate?.collectionTime ?? "",
       deliveryDate: form.deliveryDate, deliveryTime: form.deliveryTime,
       makeModel: form.makeModel || duplicate?.makeModel || "", carType: duplicate?.carType ?? "",
-      registration: form.registration.toUpperCase().replace(/\s/g, ""), payslipRegistration: duplicate?.payslipRegistration ?? "",
+      registration: parseRegistrationInput(form.registration)[0] ?? "", registrations: parseRegistrationInput(form.registration), payslipRegistration: duplicate?.payslipRegistration ?? "",
       customerType: duplicate?.customerType ?? "", pickupTown: form.pickupTown,
       pickupPostcode: form.pickupPostcode.toUpperCase().replace(/\s/g, ""), deliveryTown: form.deliveryTown,
       deliveryPostcode: form.deliveryPostcode.toUpperCase().replace(/\s/g, ""),
@@ -88,7 +89,7 @@ export function CatchUp() {
           <Field label={language === "ro" ? "Data colectării *" : "Collection date *"}><input type="date" value={form.collectionDate} onChange={event => set("collectionDate", event.target.value)} required/></Field>
           <Field label={language === "ro" ? "Data livrării *" : "Delivery date *"}><input type="date" value={form.deliveryDate} onChange={event => set("deliveryDate", event.target.value)} required/></Field>
           <Field label="Job Ref *"><input value={form.jobRef} onChange={event => set("jobRef", event.target.value)} placeholder="26101234" required/></Field>
-          <Field label={language === "ro" ? "Înmatriculare, opțional" : "Registration, optional"}><input value={form.registration} onChange={event => set("registration", event.target.value)} placeholder={language === "ro" ? "Lasă gol dacă nu o ai" : "Leave blank if unavailable"}/></Field>
+          <Field label={language === "ro" ? "Înmatriculare sau înmatriculări, opțional" : "Registration or registrations, optional"}><input value={form.registration} onChange={event => set("registration", event.target.value)} placeholder="X005WAT / KJ23LHE"/></Field>
           <Field label={language === "ro" ? "Oraș pickup *" : "Pickup town *"}><input value={form.pickupTown} onChange={event => set("pickupTown", event.target.value)} required/></Field>
           <Field label={language === "ro" ? "Postcode pickup" : "Pickup postcode"}><input value={form.pickupPostcode} onChange={event => set("pickupPostcode", event.target.value)}/></Field>
           <Field label={language === "ro" ? "Oraș livrare *" : "Delivery town *"}><input value={form.deliveryTown} onChange={event => set("deliveryTown", event.target.value)} required/></Field>

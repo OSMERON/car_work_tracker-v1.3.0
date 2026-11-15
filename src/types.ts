@@ -1,5 +1,6 @@
 export type JobStatus = "collected" | "delivered" | "cancelled";
 export type Language = "ro" | "en";
+export type JobProtocol = "model" | "hilton" | "autorola" | "other";
 
 export interface Job {
   id: string;
@@ -33,6 +34,25 @@ export interface Job {
   source: "manual" | "payslip";
   createdAt: string;
   updatedAt: string;
+  rawJobRef?: string;
+  pickupCompany?: string;
+  pickupAddress?: string;
+  deliveryCompany?: string;
+  deliveryAddress?: string;
+  vin?: string;
+  vinIncomplete?: boolean;
+  modelPin?: string;
+  vehicleId?: string;
+  otherInfo?: string;
+  ocrRawText?: string;
+  ocrConfidence?: number;
+  sourceImageCount?: number;
+  plannedDeliveryDate?: string;
+  registrations?: string[];
+  vehicleYear?: string;
+  protocol?: JobProtocol;
+  protocolExtraDetected?: number | null;
+  protocolExtraPaid?: number | null;
 }
 
 export interface Expense {
@@ -89,6 +109,8 @@ export interface PayslipExpense {
   description: string;
   uploaded: number;
   payable: number;
+  actionNote?: string;
+  needsCheck?: boolean;
 }
 
 export interface AppData {

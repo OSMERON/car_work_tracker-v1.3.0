@@ -250,8 +250,9 @@ export const routePerformance = (data: AppData, start: string, end: string) => {
   const groups = new Map<string, { jobs: number; gross: number; costs: number; miles: number }>();
   for (const job of rangeJobs(data, start, end)) {
     const fallback = job.makeModel.split("/").map(value => value.replace(/\([^)]*\)/g, "").trim());
-    const from = job.pickupPostcode || job.pickupTown || fallback[0] || "Necunoscut";
-    const to = job.deliveryPostcode || job.deliveryTown || fallback[1] || "Necunoscut";
+    const classified = job.protocol === "autorola" ? "SHADOW · CLASSIFIED" : "Necunoscut";
+    const from = job.pickupPostcode || job.pickupTown || fallback[0] || classified;
+    const to = job.deliveryPostcode || job.deliveryTown || fallback[1] || classified;
     const key = `${from} → ${to}`;
     const row = groups.get(key) ?? { jobs: 0, gross: 0, costs: 0, miles: 0 };
     row.jobs += 1;
