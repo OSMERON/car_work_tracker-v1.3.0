@@ -3,7 +3,7 @@ import { AppShell } from "./components/AppShell";
 import { Dashboard } from "./pages/Dashboard";
 import { Collect } from "./pages/Collect";
 import { Deliver } from "./pages/Deliver";
-import { Analytics } from "./pages/Analytic";
+import { Analytics } from "./pages/Analytics";
 import { PerformancePage } from "./pages/Performance";
 import { HistoryPage } from "./pages/History";
 import { PayslipsPage } from "./pages/Payslips";
