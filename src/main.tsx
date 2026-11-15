@@ -9,6 +9,7 @@ import "./reports-tax.css";
 import "./aris.css";
 import "./theme.css";
 import "./insights.css";
+import "./aris-enhancements.css";
 
 const savedTheme = localStorage.getItem("aris-theme-mode");
 const initialMode = savedTheme === "light" || savedTheme === "dark" ? savedTheme : "auto";

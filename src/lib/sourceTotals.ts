@@ -1,6 +1,7 @@
 import type { AppData, PayslipExpense, PayslipJob } from "../types";
 import { isoInRange } from "./date";
 import { tariffForMiles } from "./rates";
+import { isCompanyFuelPdfRow } from "./expenseRules";
 
 export interface SourceTotal {
   jobs: number;
@@ -41,7 +42,7 @@ export const calculateSourceTotals = (data: AppData, start: string, end: string)
       const ref = key(job.jobRef) || `${payslip.weekStart}-${index}`;
       pdfJobs.set(ref, job);
     });
-    (payslip.pdfExpenses ?? []).forEach((expense, index) => {
+    (payslip.pdfExpenses ?? []).filter(expense => !isCompanyFuelPdfRow(expense)).forEach((expense, index) => {
       if (!isoInRange(expense.date || payslip.weekStart, start, end)) return;
       const expenseKey = [expense.date, key(expense.jobRef), expense.uploaded.toFixed(2), index].join("|");
       pdfExpenses.set(expenseKey, expense);

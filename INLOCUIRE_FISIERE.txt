@@ -1,0 +1,22 @@
+A.R.I.S. 1.5.3
+
+1. Deschide ZIP-ul.
+2. Copiaza toate folderele si fisierele peste proiectul tau.
+3. Accepta Replace pentru fisierele existente.
+4. Deschide PowerShell in folderul proiectului.
+5. Ruleaza: npm install
+6. Ruleaza: npm run build
+7. Ruleaza: git add .
+8. Ruleaza: git commit -m "ARIS v1.5.3 intelligence and company fuel"
+9. Ruleaza: git push
+10. Asteapta marcajul verde din GitHub Actions.
+11. Deschide aplicatia si apasa Ctrl+F5 o singura data.
+
+Schimbari principale:
+- A.R.I.S. Intelligence are pagina separata, filtre si grafice proprii.
+- Butonul central de pe telefon deschide A.R.I.S.
+- Meniul contine acces vizibil la A.R.I.S. Intelligence.
+- Combustibilul din PDF este marcat drept card companie.
+- Combustibilul nu intra in rambursari, costuri personale, profit sau taxe.
+- A.R.I.S. arata combustibilul pe masina, media pe masina si costul pe mila.
+- A.R.I.S. compara ora plecarii de acasa cu ora primului job.

@@ -4,6 +4,7 @@ import type { AppData, DailyLog, Expense, Job, Language, Payslip, PerformanceSet
 import { clearLocalFiles, deleteJobImages } from "../lib/jobImageStore";
 import { jobRegistrations, normalizeRegistration } from "../lib/jobProtocols";
 import { tariffForMiles } from "../lib/rates";
+import { isCompanyFuelExpense, isCompanyFuelPdfRow } from "../lib/expenseRules";
 
 const DATA_KEY = "car-work-tracker-data-v1";
 const LANGUAGE_KEY = "car-work-tracker-language";
@@ -55,7 +56,7 @@ const normalizeData = (input: AppData): AppData => ({
   },
   taxSettings: normalizeTaxSettings(input.taxSettings),
   jobs: normalizeJobs(input.jobs),
-  expenses: input.expenses.map(expense => ({
+  expenses: input.expenses.filter(expense => !isCompanyFuelExpense(expense)).map(expense => ({
     ...expense,
     vatAmount: expense.vatAmount ?? 0,
     vatReclaimable: expense.vatReclaimable ?? false,
@@ -174,7 +175,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
     const mergedExpenses = prev.expenses.filter(expense => !(expense.source === "payslip" && expense.weekStart === item.weekStart));
     const matchedManual = new Set<number>();
-    const pdfExpenses: Expense[] = (item.pdfExpenses ?? []).map((row, index) => ({
+    const pdfExpenses: Expense[] = (item.pdfExpenses ?? []).filter(row => !isCompanyFuelPdfRow(row)).map((row, index) => ({
       id: `pdf-expense-${item.weekStart}-${row.jobRef}-${index}`,
       jobRef: row.jobRef,
       date: row.date,

@@ -1,7 +1,7 @@
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import {
   Activity, ArrowDown, ArrowUp, Banknote, BrainCircuit, CalendarDays, CarFront,
-  ChartNoAxesCombined, Clock3, Eye, EyeOff, Gauge, Layers3, ListFilter, Route,
+  ChartNoAxesCombined, Clock3, Eye, EyeOff, Fuel, Gauge, Layers3, ListFilter, Route,
   Settings2, ShieldCheck, Sparkles, TriangleAlert, WalletCards
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -17,9 +17,10 @@ import { performanceDays, performanceSnapshot, routePerformance } from "../lib/p
 import { calculateSourceTotals, type SourceTotals } from "../lib/sourceTotals";
 import { ProtocolBadge } from "../components/ProtocolBadge";
 import { PROTOCOLS } from "../lib/jobProtocols";
+import { isCompanyFuelPdfRow } from "../lib/expenseRules";
 import type { AppData, JobProtocol, Language } from "../types";
 
-type InsightId = "activity" | "money" | "routes" | "time" | "expenses" | "expenseAudit" | "protocols" | "sources";
+type InsightId = "activity" | "money" | "routes" | "time" | "workStart" | "fuel" | "expenses" | "expenseAudit" | "protocols" | "sources";
 type InsightConfig = { id: InsightId; visible: boolean };
 type Scope = "day" | "week" | "month" | "all";
 type SourceChoice = keyof SourceTotals;
@@ -28,8 +29,8 @@ type Metric = "income" | "net" | "costs" | "jobs" | "miles";
 type ChartStyle = "area" | "bar" | "line";
 type TrendRow = { label: string; jobs: number; miles: number; income: number; costs: number; net: number };
 
-const DEFAULT_CONFIG: InsightConfig[] = ["activity", "money", "sources", "expenseAudit", "protocols", "routes", "time", "expenses"].map(id => ({ id: id as InsightId, visible: true }));
-const CONFIG_KEY = "aris-insights-config-v2";
+const DEFAULT_CONFIG: InsightConfig[] = ["activity", "workStart", "fuel", "money", "sources", "expenseAudit", "protocols", "routes", "time", "expenses"].map(id => ({ id: id as InsightId, visible: true }));
+const CONFIG_KEY = "aris-insights-config-v3";
 const colors = ["#56d7ff", "#8c7cff", "#23e6a8", "#ffb84d", "#ff5c85", "#42a5f5"];
 const sourceKey = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, "");
 const lastDayOfMonth = (iso: string) => {
@@ -65,6 +66,17 @@ const metricLabel = (metric: Metric, language: Language) => ({
 }[metric]);
 
 const formatMetric = (metric: Metric, value: number) => metric === "income" || metric === "net" || metric === "costs" ? money(value) : number(value);
+const timeAsHours = (value: string) => {
+  if (!/^\d{2}:\d{2}$/.test(value)) return null;
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours + minutes / 60;
+};
+const hoursAsTime = (value: number | null | undefined) => {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+  const hours = Math.floor(value);
+  const minutes = Math.round((value - hours) * 60);
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+};
 
 const buildTrend = (data: AppData, start: string, end: string, source: SourceChoice, language: Language): TrendRow[] => {
   const rows: TrendRow[] = [];
@@ -127,6 +139,35 @@ export function InsightsPage() {
   const trendData = useMemo(() => buildTrend(data, range.start, range.end, source, language), [data, range, source, language]);
   const periodExpenses = useMemo(() => data.expenses.filter(expense => expense.date >= range.start && expense.date <= range.end), [data.expenses, range]);
   const pdfExpenseRows = useMemo(() => data.payslips.flatMap(item => (item.pdfExpenses ?? []).filter(expense => (expense.date || item.weekStart) >= range.start && (expense.date || item.weekStart) <= range.end)), [data.payslips, range]);
+  const fuelRows = useMemo(() => pdfExpenseRows.filter(isCompanyFuelPdfRow), [pdfExpenseRows]);
+  const fuelData = useMemo(() => {
+    const rows = new Map<string, { jobRef: string; label: string; car: string; fuel: number; miles: number; costPerMile: number }>();
+    for (const fuel of fuelRows) {
+      const job = data.jobs.find(item => sourceKey(item.jobRef) === sourceKey(fuel.jobRef));
+      const pdfJob = data.payslips.flatMap(item => item.pdfJobs ?? []).find(item => sourceKey(item.jobRef) === sourceKey(fuel.jobRef));
+      const current = rows.get(fuel.jobRef) ?? {
+        jobRef: fuel.jobRef,
+        label: job?.registration || job?.payslipRegistration || pdfJob?.registration || fuel.jobRef,
+        car: job?.makeModel || pdfJob?.description || (language === "ro" ? "Mașină neidentificată" : "Unidentified car"),
+        fuel: 0,
+        miles: job?.payslipMiles ?? job?.estimatedMiles ?? pdfJob?.miles ?? 0,
+        costPerMile: 0
+      };
+      current.fuel += fuel.uploaded;
+      current.costPerMile = current.miles ? current.fuel / current.miles : 0;
+      rows.set(fuel.jobRef, current);
+    }
+    return [...rows.values()].sort((a, b) => b.fuel - a.fuel);
+  }, [fuelRows, data.jobs, data.payslips, language]);
+  const workStartData = useMemo(() => days.map(day => {
+    const log = (data.dailyLogs ?? []).find(item => item.date === day.date);
+    const firstJob = data.jobs
+      .filter(job => job.collectionDate === day.date || job.deliveryDate === day.date)
+      .flatMap(job => [job.collectionTime, job.deliveryTime])
+      .filter((value): value is string => /^\d{2}:\d{2}$/.test(value))
+      .sort()[0] ?? "";
+    return { day: formatShortDate(day.date, language), date: day.date, homeStart: timeAsHours(log?.leftHomeTime ?? ""), firstJob: timeAsHours(firstJob) };
+  }), [days, data.dailyLogs, data.jobs, language]);
   const protocolRows = useMemo(() => (Object.keys(PROTOCOLS) as JobProtocol[]).map(protocol => {
     const jobs = data.jobs.filter(job => job.protocol === protocol && job.status === "delivered" && (job.deliveryDate || job.collectionDate) >= range.start && (job.deliveryDate || job.collectionDate) <= range.end);
     return { protocol, jobs: jobs.length, supplement: jobs.reduce((sum, job) => sum + (job.protocolExtraPaid ?? job.protocolExtraDetected ?? 0), 0) };
@@ -163,6 +204,8 @@ export function InsightsPage() {
     money: language === "ro" ? "Bani și comparație" : "Money comparison",
     routes: language === "ro" ? "Rute profitabile" : "Profitable routes",
     time: language === "ro" ? "Timpul zilnic" : "Daily time",
+    workStart: language === "ro" ? "Ora de început" : "Work start time",
+    fuel: language === "ro" ? "Combustibil pe mașină" : "Fuel by car",
     expenses: language === "ro" ? "Cheltuieli pe categorii" : "Expenses by category",
     expenseAudit: language === "ro" ? "Controlul rambursărilor" : "Reimbursement control",
     protocols: language === "ro" ? "Protocoale speciale" : "Special protocols",
@@ -172,11 +215,11 @@ export function InsightsPage() {
   const focusAllows = (id: InsightId) => {
     if (focus === "all") return true;
     const groups: Record<Exclude<Focus, "all">, InsightId[]> = {
-      overview: ["activity", "money", "sources", "expenseAudit"],
-      operations: ["activity", "routes", "protocols"],
+      overview: ["activity", "workStart", "fuel", "money", "sources", "expenseAudit"],
+      operations: ["activity", "workStart", "fuel", "routes", "protocols"],
       money: ["money", "sources", "expenseAudit"],
-      time: ["time", "activity"],
-      expenses: ["expenses", "expenseAudit"],
+      time: ["workStart", "time", "activity"],
+      expenses: ["fuel", "expenses", "expenseAudit"],
       audit: ["sources", "expenseAudit", "protocols"]
     };
     return groups[focus].includes(id);
@@ -193,7 +236,7 @@ export function InsightsPage() {
   const personalExpenses = periodExpenses.filter(expense => expense.source === "manual" && expense.actualCost > 0 && expense.claimed <= 0);
   const partialExpenses = periodExpenses.filter(expense => expense.claimed > 0 && expense.approved > 0 && expense.approved + .01 < expense.claimed);
   const unpaidExpenses = periodExpenses.filter(expense => expense.claimed > 0 && expense.approved <= 0);
-  const checkExpenses = pdfExpenseRows.filter(expense => expense.needsCheck || /\b(?:ticket|code|receipt|query|check|missing|rejected|awaiting|pending)\b/i.test(expense.actionNote ?? ""));
+  const checkExpenses = pdfExpenseRows.filter(expense => !isCompanyFuelPdfRow(expense) && (expense.needsCheck || /\b(?:ticket|code|receipt|query|check|missing|rejected|awaiting|pending)\b/i.test(expense.actionNote ?? "")));
 
   const renderTrendChart = () => {
     const common = <><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="label"/><YAxis/><Tooltip formatter={(value: number) => formatMetric(metric, value)}/></>;
@@ -204,6 +247,8 @@ export function InsightsPage() {
 
   const renderInsight = (id: InsightId) => {
     if (id === "activity") return <InsightCard title={label(id)} explanation={language === "ro" ? "Compară numărul de mașini cu milele plătibile pentru fiecare zi." : "Compares car count with payable miles for each day."}><ResponsiveContainer width="100%" height={270}><AreaChart data={activityData}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="day"/><YAxis/><Tooltip/><Legend/><Area type="monotone" dataKey="miles" stroke={colors[0]} fill="#56d7ff33"/><Area type="monotone" dataKey="jobs" stroke={colors[2]} fill="#23e6a833"/></AreaChart></ResponsiveContainer></InsightCard>;
+    if (id === "workStart") return <InsightCard title={label(id)} explanation={language === "ro" ? "Compară ora plecării de acasă cu ora primului job. Lipsurile rămân vizibile, fără ore presupuse." : "Compares the time you left home with the first job time. Missing entries remain visible and are never assumed."}>{workStartData.some(row => row.homeStart !== null || row.firstJob !== null) ? <><ResponsiveContainer width="100%" height={230}><LineChart data={workStartData}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="day"/><YAxis domain={[0, 24]} tickFormatter={value => hoursAsTime(Number(value))}/><Tooltip formatter={(value: number) => hoursAsTime(value)}/><Legend/><Line type="monotone" dataKey="homeStart" name={language === "ro" ? "Plecare de acasă" : "Left home"} stroke={colors[1]} strokeWidth={3} connectNulls/><Line type="monotone" dataKey="firstJob" name={language === "ro" ? "Primul job" : "First job"} stroke={colors[2]} strokeWidth={3} connectNulls/></LineChart></ResponsiveContainer><div className="work-start-grid">{workStartData.filter(row => row.homeStart !== null || row.firstJob !== null).slice(-7).map(row => <div key={row.date}><strong>{row.day}</strong><span>{language === "ro" ? "Acasă" : "Home"} <b>{hoursAsTime(row.homeStart)}</b></span><span>{language === "ro" ? "Job" : "Job"} <b>{hoursAsTime(row.firstJob)}</b></span></div>)}</div></> : <EmptyInsight language={language}/>}</InsightCard>;
+    if (id === "fuel") return <InsightCard title={label(id)} explanation={language === "ro" ? "Sumele provin din PDF și au fost plătite cu cardul companiei. Nu sunt cheltuieli personale și nu necesită rambursare." : "Amounts come from the PDF and were paid with the company card. They are not personal expenses and require no reimbursement."}>{fuelData.length ? <><div className="fuel-insight-summary"><span><Fuel/><b>{money(fuelData.reduce((sum, row) => sum + row.fuel, 0))}</b><small>{language === "ro" ? "total card companie" : "company card total"}</small></span><span><CarFront/><b>{fuelData.length}</b><small>{language === "ro" ? "mașini alimentate" : "fuelled cars"}</small></span><span><Gauge/><b>{money(fuelData.reduce((sum, row) => sum + row.fuel, 0) / fuelData.length)}</b><small>{language === "ro" ? "medie pe mașină" : "average per car"}</small></span></div><ResponsiveContainer width="100%" height={220}><BarChart data={fuelData.slice(0, 10)}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="label"/><YAxis/><Tooltip formatter={(value: number) => money(value)}/><Bar dataKey="fuel" name={language === "ro" ? "Combustibil £" : "Fuel £"} fill={colors[3]} radius={[5,5,0,0]}/></BarChart></ResponsiveContainer><div className="fuel-car-table"><div><span>{language === "ro" ? "Mașină" : "Car"}</span><span>Job Ref</span><span>{language === "ro" ? "Mile" : "Miles"}</span><span>{language === "ro" ? "Combustibil" : "Fuel"}</span><span>£/mi</span></div>{fuelData.slice(0, 8).map(row => <div key={row.jobRef}><span><strong>{row.label}</strong><small>{row.car}</small></span><span>{row.jobRef}</span><span>{number(row.miles)}</span><span>{money(row.fuel)}</span><span>{row.miles ? money(row.costPerMile) : "—"}</span></div>)}</div></> : <EmptyInsight language={language}/>}</InsightCard>;
     if (id === "money") return <InsightCard title={label(id)} explanation={language === "ro" ? "Arată venitul, costurile și profitul față de perioada anterioară." : "Shows income, costs and profit against the previous period."}><ResponsiveContainer width="100%" height={270}><BarChart data={moneyData}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="name"/><YAxis/><Tooltip formatter={(value: number) => money(value)}/><Legend/><Bar dataKey="venit" fill={colors[0]} radius={[5,5,0,0]}/><Bar dataKey="costuri" fill={colors[4]} radius={[5,5,0,0]}/><Bar dataKey="profit" fill={colors[2]} radius={[5,5,0,0]}/></BarChart></ResponsiveContainer></InsightCard>;
     if (id === "sources") return <InsightCard title={label(id)} explanation={language === "ro" ? "Compară datele tale, PDF-ul și rezultatul combinat fără dubluri." : "Compares your records, PDF data and the deduplicated combined result."}><ResponsiveContainer width="100%" height={270}><BarChart data={sourceData}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="name"/><YAxis/><Tooltip/><Legend/><Bar dataKey="jobs" fill={colors[2]} radius={[5,5,0,0]}/><Bar dataKey="miles" fill={colors[0]} radius={[5,5,0,0]}/></BarChart></ResponsiveContainer></InsightCard>;
     if (id === "expenseAudit") return <InsightCard title={label(id)} explanation={language === "ro" ? "Separă costul real, suma cerută și suma plătită. Taxiul nedeclarat rămâne cost personal." : "Separates actual cost, amount claimed and amount paid. Unreported taxi stays a personal cost."}><ResponsiveContainer width="100%" height={190}><BarChart data={expenseAuditData}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="name"/><YAxis/><Tooltip formatter={(value: number) => money(value)}/><Legend/><Bar dataKey="cost" fill={colors[4]} radius={[5,5,0,0]}/><Bar dataKey="cerut" fill={colors[3]} radius={[5,5,0,0]}/><Bar dataKey="platit" fill={colors[2]} radius={[5,5,0,0]}/></BarChart></ResponsiveContainer><div className="expense-audit-summary"><span><b>{personalExpenses.length}</b>{language === "ro" ? "personale" : "personal"}</span><span><b>{partialExpenses.length}</b>{language === "ro" ? "parțiale" : "part paid"}</span><span><b>{unpaidExpenses.length}</b>{language === "ro" ? "neplătite" : "unpaid"}</span><span className={checkExpenses.length ? "warn" : ""}><b>{checkExpenses.length}</b>{language === "ro" ? "de verificat" : "to check"}</span></div>{!!checkExpenses.length && <div className="expense-action-list">{checkExpenses.slice(0, 4).map((expense, index) => <p key={`${expense.date}-${expense.jobRef}-${index}`}><TriangleAlert/><span><strong>{expense.jobRef || expense.date}</strong>{expense.actionNote || (language === "ro" ? "Verifică ticketul sau codul din PDF." : "Check the ticket or code in the PDF.")}</span></p>)}</div>}</InsightCard>;

@@ -1,5 +1,6 @@
 import type { Payslip, PayslipExpense, PayslipJob } from "../types";
 import { mondayOf } from "./date";
+import { isCompanyFuelDescription } from "./expenseRules";
 
 const PAGE_MARKER = "<<<PAYSLIP_PAGE>>>";
 const DATE_SOURCE = "\\d{2}\\/\\d{2}\\/\\d{4}";
@@ -89,14 +90,16 @@ const parseExpenses = (text: string): PayslipExpense[] => {
     const tail = compact(page.slice(rowEnd, nextStart).split(/\b(?:Total|Summary|Deliveries)\b/i)[0]).slice(0, 120);
     const actionMatch = tail.match(/\b(?:ticket|code|receipt|query|check|missing|rejected|awaiting|pending)\b[^£]{0,80}/i);
     const actionNote = compact(actionMatch?.[0] ?? "");
+    const description = compact(match[3]);
+    const companyFuel = isCompanyFuelDescription(description);
     expenses.push({
       date: isoDate(match[1]),
       jobRef: match[2],
-      description: compact(match[3]),
+      description,
       uploaded: money(match[4]),
       payable: money(match[5]),
-      actionNote,
-      needsCheck: Boolean(actionNote)
+      actionNote: companyFuel ? "Company fuel card" : actionNote,
+      needsCheck: companyFuel ? false : Boolean(actionNote)
     });
   }
   return expenses;
