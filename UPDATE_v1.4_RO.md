@@ -1,4 +1,4 @@
-# A.R.I.S. v1.4.3
+# A.R.I.S. v1.4.4
 
 ## Ce primești
 
@@ -26,6 +26,9 @@
 - prioritate pentru milele și plata finală din PDF
 - încărcare simultană pentru mai multe PDF-uri
 - blocarea unui PDF identic și a unei săptămâni deja importate
+- temă automată după sistem, plus control manual Auto, Zi și Noapte
+- contrast verificat pentru dashboard, formulare, rapoarte, PDF, taxe și performanță
+- temă de zi alb-albastră și temă de noapte cu text mai luminos
 
 ## Date necesare pentru rezultate bune
 
@@ -79,7 +82,7 @@ Pentru taxe:
 2. Extrage fișierele.
 3. Înlocuiește fișierele din repository cu cele din arhivă.
 4. Nu încărca folderul node_modules.
-5. Fă un commit cu mesajul `A.R.I.S. v1.4.3 Jarvis HUD`.
+5. Fă un commit cu mesajul `A.R.I.S. v1.4.4 Day Night Contrast`.
 6. Trimite schimbările pe branch-ul main.
 7. GitHub Actions reconstruiește și publică aplicația.
 

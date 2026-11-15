@@ -1,4 +1,4 @@
-const CACHE = "car-work-tracker-aris-v1.4.3";
+const CACHE = "car-work-tracker-aris-v1.4.4";
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(["./", "./manifest.webmanifest", "./car-icon.svg"])));
   self.skipWaiting();

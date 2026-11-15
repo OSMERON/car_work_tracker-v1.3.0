@@ -8,6 +8,8 @@ Version 1.4.2 includes the complete type definitions required by DataContext and
 
 Version 1.4.3 introduces the complete A.R.I.S. high-tech HUD and separates manual records, PDF records and the deduplicated combined result. Combined totals use Job Ref as the identity, prefer PDF mileage and final PDF payment, and keep unmatched manual work visible. The payslip screen accepts multiple PDFs at once and blocks duplicate file content or an already imported week.
 
+Version 1.4.4 adds a complete contrast system for every page. It includes automatic system theme detection, manual Auto, Day and Night controls, a high-contrast white and blue day theme, and a darker night theme with brighter text. The selected mode is saved on the device.
+
 The VAT area now uses Standard VAT with Accrual or Cash Accounting. It extracts output VAT from VAT-inclusive RAS totals when selected. Input VAT remains zero until an expense has an eligible VAT amount and valid evidence. The app creates a reviewable nine-box draft. It does not submit a return to HMRC.
 
 Version 1.1 adds a completed-job catch-up screen. Job Ref is the required identifier and registration is optional. Weeks remain marked incomplete until you confirm that every job has been entered. Personal payment differences and possible losses are hidden while a week is incomplete, but the PDF's own arithmetic is still checked.

@@ -7,6 +7,12 @@ import "./styles.css";
 import "./catch-up.css";
 import "./reports-tax.css";
 import "./aris.css";
+import "./theme.css";
+
+const savedTheme = localStorage.getItem("aris-theme-mode");
+const initialMode = savedTheme === "light" || savedTheme === "dark" ? savedTheme : "auto";
+document.documentElement.dataset.themeMode = initialMode;
+document.documentElement.dataset.theme = initialMode === "auto" ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : initialMode;
 
 ReactDOM.createRoot(document.getElementById("root")!).render(<React.StrictMode><HashRouter><DataProvider><App/></DataProvider></HashRouter></React.StrictMode>);
 if ("serviceWorker" in navigator && import.meta.env.PROD) window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js"));
