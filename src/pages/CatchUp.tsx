@@ -8,8 +8,8 @@ import { jobMiles } from "../lib/analytics";
 import type { Expense, Job } from "../types";
 import { parseRegistrationInput } from "../lib/jobProtocols";
 
-type ExpenseRow = { category: string; actual: string; claimed: string; receipt: boolean };
-const blankExpense = (): ExpenseRow => ({ category: "Train", actual: "", claimed: "", receipt: true });
+type ExpenseRow = { category: string; actual: string; claimed: string; receipt: boolean; hasTicket: boolean; rasCode: string };
+const blankExpense = (): ExpenseRow => ({ category: "Train", actual: "", claimed: "", receipt: false, hasTicket: false, rasCode: "" });
 const blankForm = () => ({
   collectionDate: todayIso(), deliveryDate: todayIso(), deliveryTime: "", jobRef: "", registration: "",
   makeModel: "", pickupTown: "", pickupPostcode: "", deliveryTown: "", deliveryPostcode: "",
@@ -67,7 +67,7 @@ export function CatchUp() {
     const expenses: Expense[] = expenseRows.filter(row => row.actual || row.claimed).map(row => ({
       id: crypto.randomUUID(), jobRef: job.jobRef, date: form.deliveryDate, weekStart,
       category: row.category, description: row.category, actualCost: Number(row.actual) || 0,
-      claimed: Number(row.claimed) || 0, approved: 0, receipt: row.receipt, notes: "Catch-up entry", source: "manual"
+      claimed: Number(row.claimed) || 0, approved: 0, receipt: row.receipt, hasTicket: row.hasTicket, rasCode: row.rasCode.replace(/[^A-Za-z0-9]/g, "").toUpperCase(), reimbursementStatus: "review", notes: "Catch-up entry", source: "manual"
     }));
     if (expenses.length) saveExpenses(expenses);
     setWeekComplete(weekStart, false);
@@ -107,7 +107,7 @@ export function CatchUp() {
           <select value={row.category} onChange={event => setExpenseRows(rows => rows.map((item, itemIndex) => itemIndex === index ? {...item, category:event.target.value} : item))}><option>Train</option><option>Bus</option><option>Taxi</option><option>Parking</option><option>Misc</option></select>
           <input type="number" min="0" step="0.01" placeholder={language === "ro" ? "Cost real £" : "Actual cost £"} value={row.actual} onChange={event => setExpenseRows(rows => rows.map((item, itemIndex) => itemIndex === index ? {...item, actual:event.target.value} : item))}/>
           <input type="number" min="0" step="0.01" placeholder={language === "ro" ? "Cerut £" : "Claimed £"} value={row.claimed} onChange={event => setExpenseRows(rows => rows.map((item, itemIndex) => itemIndex === index ? {...item, claimed:event.target.value} : item))}/>
-          <label className="check small"><input type="checkbox" checked={row.receipt} onChange={event => setExpenseRows(rows => rows.map((item, itemIndex) => itemIndex === index ? {...item, receipt:event.target.checked} : item))}/>{language === "ro" ? "Chitanță" : "Receipt"}</label>
+          {row.category === "Taxi" ? <input placeholder={language === "ro" ? "Cod RAS" : "RAS code"} value={row.rasCode} onChange={event=>setExpenseRows(rows=>rows.map((item,itemIndex)=>itemIndex===index?{...item,rasCode:event.target.value.replace(/[^A-Za-z0-9]/g,"").toUpperCase()}:item))}/> : ["Bus","Train"].includes(row.category) ? <label className="check small"><input type="checkbox" checked={row.hasTicket} onChange={event=>setExpenseRows(rows=>rows.map((item,itemIndex)=>itemIndex===index?{...item,hasTicket:event.target.checked}:item))}/>{language === "ro" ? "Am biletul" : "I have the ticket"}</label> : <label className="check small"><input type="checkbox" checked={row.receipt} onChange={event => setExpenseRows(rows => rows.map((item, itemIndex) => itemIndex === index ? {...item, receipt:event.target.checked} : item))}/>{language === "ro" ? "Am chitanța" : "I have the receipt"}</label>}
           {expenseRows.length > 1 && <button className="icon-button" type="button" onClick={() => setExpenseRows(rows => rows.filter((_, itemIndex) => itemIndex !== index))}>×</button>}
         </div>)}
         {error && <p className="error-message">{error}</p>}{message && <p className="success-message">{message}</p>}

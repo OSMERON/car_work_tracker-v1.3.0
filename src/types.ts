@@ -4,6 +4,7 @@ export type JobProtocol = "model" | "hilton" | "autorola" | "other";
 export type VehicleType = "electric" | "petrol" | "diesel" | "hybrid" | "unspecified";
 export type PaymentSource = "self" | "company";
 export type ThemeMode = "light" | "dark";
+export type ReimbursementStatus = "full" | "partial" | "unpaid" | "review";
 
 export interface FuelEntry {
   litres: number | null;
@@ -99,6 +100,14 @@ export interface Expense {
   includeInTax?: boolean;
   notes: string;
   source: "manual" | "payslip";
+  rasCode?: string;
+  hasTicket?: boolean;
+  reimbursementStatus?: ReimbursementStatus;
+  reimbursementOverride?: ReimbursementStatus | null;
+  reimbursementNote?: string;
+  correctedByUser?: boolean;
+  resubmittedToOffice?: boolean;
+  matchedPayslipId?: string;
 }
 
 export interface Payslip {
@@ -120,6 +129,7 @@ export interface Payslip {
   importedAt?: string;
   pdfJobs?: PayslipJob[];
   pdfExpenses?: PayslipExpense[];
+  expenseReviewConfirmed?: boolean;
 }
 
 export interface PayslipJob {

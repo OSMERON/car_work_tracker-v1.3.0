@@ -41,16 +41,34 @@ function ThemeSwitch({ language }: { language: "ro" | "en" }) {
 
 export function AppShell() {
   const { language } = useData(); const t=tFor(language);
+  const [mobileNavVisible, setMobileNavVisible] = useState(true);
+  useEffect(() => {
+    let timer = window.setTimeout(() => setMobileNavVisible(false), 5000);
+    const show = (event?: Event) => {
+      const target = event?.target as HTMLElement | null;
+      if (target?.matches("input, textarea, select, [contenteditable='true']")) return;
+      setMobileNavVisible(true);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setMobileNavVisible(false), 5000);
+    };
+    const focusIn = () => { window.clearTimeout(timer); setMobileNavVisible(false); };
+    const focusOut = () => { window.clearTimeout(timer); };
+    document.addEventListener("pointerdown", show, { passive: true });
+    document.addEventListener("keydown", show);
+    document.addEventListener("focusin", focusIn);
+    document.addEventListener("focusout", focusOut);
+    return () => { window.clearTimeout(timer); document.removeEventListener("pointerdown", show); document.removeEventListener("keydown", show); document.removeEventListener("focusin", focusIn); document.removeEventListener("focusout", focusOut); };
+  }, []);
   return <div className="app-shell">
     <div className="global-hud-grid" aria-hidden="true"/>
     <ThemeSwitch language={language}/>
     <aside className="sidebar">
-      <div className="brand"><span className="brand-mark"><i/></span><div><strong>A.R.I.S.</strong><small>Adaptive Route Intelligence System</small></div></div>
+      <div className="brand"><span className="brand-mark"><i/></span><div><strong>A.R.I.S.</strong><small>{language === "ro" ? "Sistem adaptiv de inteligență a rutelor" : "Adaptive Route Intelligence System"}</small></div></div>
       <nav>{items.map(([to,Icon,key])=><NavLink key={to} to={to} end={to==="/"} className={({isActive})=>isActive?"active":""}><Icon size={20}/><span>{t(key)}</span></NavLink>)}</nav>
-      <div className="sidebar-core"><Radar/><span><b>NEURAL CORE</b><small>A.R.I.S. 1.5.6</small></span><i/></div>
-      <div className="side-note"><div><Wifi/><span><b>{language === "ro" ? "Sistem online" : "System online"}</b><small>DATA LINK STABLE</small></span><ShieldCheck/></div><small>Standard VAT · Accrual</small></div>
+      <div className="sidebar-core"><Radar/><span><b>{language === "ro" ? "NUCLEU NEURAL" : "NEURAL CORE"}</b><small>A.R.I.S. 1.5.7</small></span><i/></div>
+      <div className="side-note"><div><Wifi/><span><b>{language === "ro" ? "Sistem online" : "System online"}</b><small>{language === "ro" ? "LEGĂTURĂ DATE STABILĂ" : "DATA LINK STABLE"}</small></span><ShieldCheck/></div><small>{language === "ro" ? "TVA standard · Contabilitate de angajamente" : "Standard VAT · Accrual"}</small></div>
     </aside>
     <main className="main"><Outlet/></main>
-    <nav className="bottom-nav">{mobileItems.map(([to,Icon,key])=><NavLink key={to} to={to} end={to==="/"} className={({isActive})=>`${isActive?"active":""} ${to==="/intelligence"?"aris-center-nav":""}`.trim()}><Icon size={20}/><span>{to === "/intelligence" ? "A.R.I.S." : t(key)}</span></NavLink>)}<NavLink to="/menu"><Menu size={20}/><span>{t("menu")}</span></NavLink></nav>
+    <nav className={`bottom-nav ${mobileNavVisible ? "visible" : "auto-hidden"}`}>{mobileItems.map(([to,Icon,key])=><NavLink key={to} to={to} end={to==="/"} className={({isActive})=>`${isActive?"active":""} ${to==="/intelligence"?"aris-center-nav":""}`.trim()}><Icon size={20}/><span>{to === "/intelligence" ? "A.R.I.S." : t(key)}</span></NavLink>)}<NavLink to="/menu"><Menu size={20}/><span>{t("menu")}</span></NavLink></nav>
   </div>;
 }

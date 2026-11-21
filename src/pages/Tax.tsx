@@ -160,9 +160,11 @@ export function TaxPage() {
 }
 
 function VatBox({ box, label, value, explanation, calculated = false }: { box: number; label: string; value: number; explanation?: string; calculated?: boolean }) {
-  return <div className={`vat-box ${calculated ? "calculated" : ""}`}><div><strong>Box {box}: {label}</strong>{explanation && <small>{explanation}</small>}{calculated && <small>Calculated automatically</small>}</div><output><span>£</span><strong>{value.toFixed(2)}</strong></output></div>;
+  const { language } = useData();
+  return <div className={`vat-box ${calculated ? "calculated" : ""}`}><div><strong>{language === "ro" ? "Caseta" : "Box"} {box}: {label}</strong>{explanation && <small>{explanation}</small>}{calculated && <small>{language === "ro" ? "Calculat automat" : "Calculated automatically"}</small>}</div><output><span>£</span><strong>{value.toFixed(2)}</strong></output></div>;
 }
 
 function IncomeSummary({ title, summary }: { title: string; summary: ReturnType<typeof calculateIncomeTaxSummary> }) {
-  return <article><h3>{title}</h3><div><span>Gross receipts</span><strong>{money(summary.grossReceipts)}</strong></div><div><span>Standard VAT</span><strong>{money(summary.outputVat)}</strong></div><div><span>Turnover for accounts</span><strong>{money(summary.turnoverForAccounts)}</strong></div><div><span>Business expenses</span><strong>{money(summary.expenses)}</strong></div><div className="income-profit"><span>Estimated profit</span><strong>{money(summary.estimatedProfit)}</strong></div></article>;
+  const { language } = useData();
+  return <article><h3>{title}</h3><div><span>{language === "ro" ? "Încasări brute" : "Gross receipts"}</span><strong>{money(summary.grossReceipts)}</strong></div><div><span>{language === "ro" ? "TVA standard" : "Standard VAT"}</span><strong>{money(summary.outputVat)}</strong></div><div><span>{language === "ro" ? "Cifră de afaceri contabilă" : "Turnover for accounts"}</span><strong>{money(summary.turnoverForAccounts)}</strong></div><div><span>{language === "ro" ? "Cheltuieli de afaceri" : "Business expenses"}</span><strong>{money(summary.expenses)}</strong></div><div className="income-profit"><span>{language === "ro" ? "Profit estimat" : "Estimated profit"}</span><strong>{money(summary.estimatedProfit)}</strong></div></article>;
 }

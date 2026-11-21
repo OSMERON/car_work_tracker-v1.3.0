@@ -1,166 +1,77 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { Banknote, BarChart3, BrainCircuit, CalendarDays, CarFront, Clock3, Fuel, Gauge, Hourglass, Route, Save, TimerReset } from "lucide-react";
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { money, number } from "../components/Ui";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
+import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { PageHeader, money } from "../components/Ui";
 import { useData } from "../store/DataContext";
 import { addDays, formatShortDate, mondayOf, todayIso } from "../lib/date";
-import { calculateSourceTotals, type SourceTotals } from "../lib/sourceTotals";
-import { isCompanyFuelPdfRow } from "../lib/expenseRules";
 import { jobMiles } from "../lib/analytics";
 import { tariffForMiles } from "../lib/rates";
-import { routePerformance } from "../lib/performance";
-import type { DailyLog, Job, Language, PayslipJob } from "../types";
 import { calculateConsumption } from "../lib/consumption";
+import type { Job, Language } from "../types";
 
-type Scope = "week" | "month" | "custom";
-type SourceChoice = keyof SourceTotals;
-type DailyRow = { date: string; label: string; jobs: number; miles: number; jobIncome: number; waitingIncome: number; totalIncome: number; workHours: number; hourly: number; startHour: number | null };
+type Scope="week"|"month"|"custom";
+type ChartDatum=Record<string,string|number>;
+type ChartSpec={title:string;subtitle:string;data:ChartDatum[];keys:Array<{key:string;label:string;color:string}>;missing:string;kind?:"line"|"bar";unit?:string};
+const round=(value:number)=>Math.round(value*100)/100;
+const sourceDate=(job:Job)=>job.deliveryDate||job.collectionDate;
+const rangeFor=(scope:Scope,anchor:string,start:string,end:string)=>{if(scope==="week"){const value=mondayOf(anchor);return{start:value,end:addDays(value,6)}}if(scope==="month")return{start:`${anchor.slice(0,7)}-01`,end:`${anchor.slice(0,7)}-31`};return{start:start||"2000-01-01",end:end||"2100-12-31"}};
+const group=(rows:Array<{label:string;[key:string]:string|number}>,keys:string[])=>{const map=new Map<string,ChartDatum>();rows.forEach(row=>{const current=map.get(row.label)??{label:row.label};keys.forEach(key=>current[key]=Number(current[key]??0)+Number(row[key]??0));map.set(row.label,current)});return[...map.values()]};
+const carLabel=(job:Job)=>job.registration||job.payslipRegistration||job.makeModel||job.jobRef;
+const L=(language:Language,ro:string,en:string)=>language==="ro"?ro:en;
 
-const sourceKey = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, "");
-const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
-const timeMinutes = (value: string) => { if (!/^\d{2}:\d{2}$/.test(value)) return null; const [hours, minutes] = value.split(":").map(Number); return hours * 60 + minutes; };
-const durationMinutes = (start: string, end: string, date: string) => {
-  const startMinutes = timeMinutes(start);
-  let endMinutes = timeMinutes(end);
-  if (startMinutes === null) return 0;
-  if (endMinutes === null && date === todayIso()) { const now = new Date(); endMinutes = now.getHours() * 60 + now.getMinutes(); }
-  if (endMinutes === null) return 0;
-  return endMinutes >= startMinutes ? endMinutes - startMinutes : 1440 - startMinutes + endMinutes;
-};
-const decimalTime = (value: string) => { const minutes = timeMinutes(value); return minutes === null ? null : round2(minutes / 60); };
-const timeLabel = (value: number | null) => { if (value === null) return "—"; const hours = Math.floor(value); const minutes = Math.round((value - hours) * 60); return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`; };
-const periodRange = (scope: Scope, anchor: string, earliest: string, latest: string) => {
-  if (scope === "week") { const start = mondayOf(anchor); return { start, end: addDays(start, 6) }; }
-  if (scope === "month") { const start = `${anchor.slice(0, 7)}-01`; const next = new Date(`${start}T12:00:00`); next.setMonth(next.getMonth() + 1); return { start, end: addDays(next.toISOString().slice(0, 10), -1) }; }
-  return { start: earliest, end: latest };
-};
-const daysBetween = (start: string, end: string) => { const rows: string[] = []; let date = start; while (date <= end && rows.length < 370) { rows.push(date); date = addDays(date, 1); } return rows; };
-const sourceLabel = (source: SourceChoice, language: Language) => source === "manual" ? (language === "ro" ? "Datele mele" : "My data") : source === "pdf" ? "PDF" : (language === "ro" ? "Combinat fără dubluri" : "Combined without duplicates");
-
-export function InsightsPage() {
-  const { data, language, saveDailyLog } = useData();
-  const allDates = useMemo(() => {
-    const dates = [...data.jobs.flatMap(job => [job.collectionDate, job.deliveryDate]), ...data.payslips.map(payslip => payslip.weekStart), ...(data.dailyLogs ?? []).map(log => log.date)].filter(Boolean).sort();
-    const today = todayIso();
-    return { earliest: dates[0] ?? mondayOf(today), latest: dates.at(-1) ?? today };
-  }, [data]);
-  const [scope, setScope] = useState<Scope>("week");
-  const [anchor, setAnchor] = useState(todayIso());
-  const [customStart, setCustomStart] = useState("");
-  const [customEnd, setCustomEnd] = useState("");
-  const [source, setSource] = useState<SourceChoice>("combined");
-  const [consumptionMetric, setConsumptionMetric] = useState<"rangeUsed" | "difference" | "efficiency">("rangeUsed");
-  const [workDate, setWorkDate] = useState(todayIso());
-  const initialLog = (data.dailyLogs ?? []).find(log => log.date === todayIso());
-  const [startTime, setStartTime] = useState(initialLog?.leftHomeTime ?? "");
-  const [endTime, setEndTime] = useState(initialLog?.returnedHomeTime ?? "");
-  const [saved, setSaved] = useState(false);
-  const range = useMemo(() => scope === "custom" ? { start: customStart || allDates.earliest, end: customEnd || allDates.latest } : periodRange(scope, anchor, allDates.earliest, allDates.latest), [scope, anchor, allDates, customStart, customEnd]);
-  const totals = useMemo(() => calculateSourceTotals(data, range.start, range.end), [data, range]);
-  const selected = totals[source];
-
-  const chooseWorkDate = (date: string) => {
-    const log = (data.dailyLogs ?? []).find(item => item.date === date);
-    setWorkDate(date); setStartTime(log?.leftHomeTime ?? ""); setEndTime(log?.returnedHomeTime ?? ""); setSaved(false);
-  };
-  const saveWorkTime = (event: FormEvent) => {
-    event.preventDefault(); if (!startTime) return;
-    const current = (data.dailyLogs ?? []).find(log => log.date === workDate);
-    saveDailyLog({ id: current?.id ?? crypto.randomUUID(), date: workDate, status: "worked", leftHomeTime: startTime, returnedHomeTime: endTime, productiveMinutes: current?.productiveMinutes ?? 0, waitingMinutes: current?.waitingMinutes ?? 0, publicTransportMinutes: current?.publicTransportMinutes ?? 0, reason: current?.reason ?? "", notes: current?.notes ?? "", updatedAt: new Date().toISOString() });
-    setSaved(true);
-  };
-
-  const manualJobs = useMemo(() => data.jobs.filter(job => job.status === "delivered" && (job.deliveryDate || job.collectionDate) >= range.start && (job.deliveryDate || job.collectionDate) <= range.end), [data.jobs, range]);
-  const pdfJobs = useMemo(() => data.payslips.flatMap(payslip => (payslip.pdfJobs ?? []).filter(job => (job.date || payslip.weekStart) >= range.start && (job.date || payslip.weekStart) <= range.end)), [data.payslips, range]);
-  const dailyData = useMemo(() => buildDailyRows(daysBetween(range.start, range.end), manualJobs, pdfJobs, data.dailyLogs ?? [], source, language), [range, manualJobs, pdfJobs, data.dailyLogs, source, language]);
-  const waitingExpected = manualJobs.reduce((sum, job) => sum + (job.waitingEstimated ?? 0), 0);
-  const waitingPaid = manualJobs.reduce((sum, job) => sum + (job.waitingPaid ?? job.waitingEstimated ?? 0), 0);
-  const totalHours = dailyData.reduce((sum, day) => sum + day.workHours, 0);
-  const grossHourly = totalHours ? selected.income / totalHours : 0;
-
-  const fuelData = useMemo(() => {
-    const fuelRows = data.payslips.flatMap(payslip => (payslip.pdfExpenses ?? []).filter(row => { const date = row.date || payslip.weekStart; return isCompanyFuelPdfRow(row) && date >= range.start && date <= range.end; }));
-    const grouped = new Map<string, { jobRef: string; car: string; registration: string; fuel: number; miles: number; perMile: number }>();
-    fuelRows.forEach(row => {
-      const job = data.jobs.find(item => sourceKey(item.jobRef) === sourceKey(row.jobRef));
-      const pdf = data.payslips.flatMap(item => item.pdfJobs ?? []).find(item => sourceKey(item.jobRef) === sourceKey(row.jobRef));
-      const current = grouped.get(row.jobRef) ?? { jobRef: row.jobRef, car: job?.makeModel || pdf?.description || (language === "ro" ? "Mașină neidentificată" : "Unidentified car"), registration: job?.registration || job?.payslipRegistration || pdf?.registration || row.jobRef, fuel: 0, miles: job?.payslipMiles ?? job?.estimatedMiles ?? pdf?.miles ?? 0, perMile: 0 };
-      current.fuel += row.uploaded; current.perMile = current.miles ? current.fuel / current.miles : 0; grouped.set(row.jobRef, current);
-    });
-    return [...grouped.values()].sort((a, b) => b.fuel - a.fuel);
-  }, [data.jobs, data.payslips, range, language]);
-
-  const sourceData = (["manual", "pdf", "combined"] as SourceChoice[]).map(key => ({ name: sourceLabel(key, language), venit: totals[key].income, costuri: totals[key].costs, net: totals[key].net }));
-  const expenseRows = data.expenses.filter(expense => expense.date >= range.start && expense.date <= range.end);
-  const expenseData = [
-    { name: language === "ro" ? "Plătit de mine" : "Paid by me", value: expenseRows.reduce((sum, row) => sum + row.actualCost, 0) },
-    { name: language === "ro" ? "Cerut" : "Claimed", value: expenseRows.reduce((sum, row) => sum + row.claimed, 0) },
-    { name: language === "ro" ? "Rambursat" : "Reimbursed", value: expenseRows.reduce((sum, row) => sum + row.approved, 0) }
-  ];
-  const routes = useMemo(() => routePerformance(data, range.start, range.end).slice(0, 8), [data, range]);
-  const fuelTotal = fuelData.reduce((sum, row) => sum + row.fuel, 0);
-  const consumptionData = useMemo(() => manualJobs.map(job => ({ job, result: calculateConsumption(job) })).filter(item => item.result && !item.result.rangeIncreased).map(item => ({ ...item, label: item.job.registration || item.job.jobRef, rangeUsed: item.result!.rangeUsed, difference: item.result!.difference, efficiency: item.result!.efficiency })).sort((a, b) => (b.job.deliveryDate || b.job.collectionDate).localeCompare(a.job.deliveryDate || a.job.collectionDate)), [manualJobs]);
-  const insufficientConsumption = manualJobs.length - consumptionData.length;
-
-  return <div className="intel-only-page">
-    <header className="intel-titlebar"><div><span><BrainCircuit/> A.R.I.S. ANALYSIS ONLY · v1.5.6</span><h1>{language === "ro" ? "Panou de analiză" : "Analysis dashboard"}</h1><p>{language === "ro" ? "Numai grafice, calcule și date. Aceasta nu este pagina Acasă." : "Charts, calculations and data only. This is not the Home page."}</p></div><BarChart3/></header>
-
-    <form className="intel-start-question" onSubmit={saveWorkTime}>
-      <div><Clock3/><span><small>{language === "ro" ? "ÎNREGISTRARE ZILNICĂ" : "DAILY RECORD"}</small><strong>{language === "ro" ? "La ce oră ai început munca?" : "What time did you start work?"}</strong></span></div>
-      <label><span>{language === "ro" ? "Data" : "Date"}</span><input type="date" value={workDate} onChange={event => chooseWorkDate(event.target.value)}/></label>
-      <label className="primary-time"><span>{language === "ro" ? "Ora începutului" : "Start time"}</span><input required type="time" value={startTime} onChange={event => { setStartTime(event.target.value); setSaved(false); }}/></label>
-      <label><span>{language === "ro" ? "Ora sfârșitului, opțional" : "Finish time, optional"}</span><input type="time" value={endTime} onChange={event => { setEndTime(event.target.value); setSaved(false); }}/></label>
-      <button type="submit"><Save/>{saved ? (language === "ro" ? "Salvat" : "Saved") : (language === "ro" ? "Salvează ora" : "Save time")}</button>
-    </form>
-
-    <section className="intel-controls">
-      <label><CalendarDays/><span>{language === "ro" ? "Perioada" : "Period"}</span><div>{(["week", "month", "custom"] as Scope[]).map(value => <button type="button" key={value} className={scope === value ? "active" : ""} onClick={() => setScope(value)}>{value === "week" ? (language === "ro" ? "Săptămână" : "Week") : value === "month" ? (language === "ro" ? "Lună" : "Month") : (language === "ro" ? "Perioadă" : "Custom")}</button>)}</div></label>
-      <label><span>{language === "ro" ? "Data analizei" : "Analysis date"}</span><input type="date" value={anchor} onChange={event => setAnchor(event.target.value)}/></label>
-      {scope === "custom" && <><label><span>{language === "ro" ? "De la" : "From"}</span><input type="date" value={customStart} onChange={event => setCustomStart(event.target.value)}/></label><label><span>{language === "ro" ? "Până la" : "To"}</span><input type="date" value={customEnd} onChange={event => setCustomEnd(event.target.value)}/></label></>}
-      <label><span>{language === "ro" ? "Sursa" : "Source"}</span><select value={source} onChange={event => setSource(event.target.value as SourceChoice)}><option value="combined">{sourceLabel("combined", language)}</option><option value="manual">{sourceLabel("manual", language)}</option><option value="pdf">PDF</option></select></label>
-    </section>
-
-    <section className="intel-calculation-strip">
-      <Calculation icon={<Banknote/>} label={language === "ro" ? "Venit total" : "Total income"} value={money(selected.income)}/>
-      <Calculation icon={<Hourglass/>} label={language === "ro" ? "Waiting plătit" : "Paid waiting"} value={money(waitingPaid)}/>
-      <Calculation icon={<TimerReset/>} label={language === "ro" ? "Câștig brut pe oră" : "Gross earnings per hour"} value={totalHours ? `${money(grossHourly)}/h` : "—"}/>
-      <Calculation icon={<CarFront/>} label={language === "ro" ? "Mașini livrate" : "Delivered cars"} value={String(selected.jobs)}/>
-      <Calculation icon={<Route/>} label={language === "ro" ? "Mile plătibile" : "Payable miles"} value={number(selected.miles)}/>
-      <Calculation icon={<Fuel/>} label={language === "ro" ? "Combustibil, card companie" : "Fuel, company card"} value={money(fuelTotal)}/>
-    </section>
-
-    <section className="intel-chart-grid">
-      <ChartPanel wide title={language === "ro" ? "Consumul fiecărei mașini" : "Consumption by car"} text={language === "ro" ? "Alege indicatorul. Apasă o mașină pentru toate detaliile." : "Choose a metric. Tap a car for all details."}><div className="scope-tabs"><button type="button" className={consumptionMetric === "rangeUsed" ? "active" : ""} onClick={() => setConsumptionMetric("rangeUsed")}>{language === "ro" ? "Range consumat" : "Range used"}</button><button type="button" className={consumptionMetric === "difference" ? "active" : ""} onClick={() => setConsumptionMetric("difference")}>{language === "ro" ? "Diferență" : "Difference"}</button><button type="button" className={consumptionMetric === "efficiency" ? "active" : ""} onClick={() => setConsumptionMetric("efficiency")}>{language === "ro" ? "Eficiență" : "Efficiency"}</button></div>{consumptionData.length ? <><div className="consumption-chart-scroll"><ResponsiveContainer width={Math.max(700, consumptionData.length * 95)} height={300}><BarChart data={consumptionData}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="label"/><YAxis/><Tooltip/><Bar dataKey={consumptionMetric} fill="#43d7ff" radius={[6,6,0,0]}/></BarChart></ResponsiveContainer></div><div className="consumption-cards">{consumptionData.map(({ job, result }) => <details key={job.id}><summary><CarFront/>{job.registration || job.jobRef} · {job.makeModel || (language === "ro" ? "Mașină" : "Car")}</summary><p>{job.deliveryDate || job.collectionDate} · Job {job.jobRef}</p><p>{job.pickupTown || "?"} → {job.deliveryTown || "?"}</p><p>{language === "ro" ? "Distanță reală" : "Actual distance"}: {result!.distance.toFixed(1)} mi</p><p>{language === "ro" ? "Range consumat" : "Range used"}: {result!.rangeUsed.toFixed(1)} mi</p><p>{language === "ro" ? "Diferență" : "Difference"}: {result!.difference.toFixed(1)} mi</p><p>{language === "ro" ? "Eficiență" : "Efficiency"}: {result!.efficiency.toFixed(1)}%</p></details>)}</div></> : <Empty language={language}/>} {!!insufficientConsumption && <p className="calculation-note">{insufficientConsumption} {language === "ro" ? "mașini cu date insuficiente, excluse din grafic" : "cars with insufficient data, excluded from chart"}</p>}</ChartPanel>
-      <ChartPanel title={language === "ro" ? "Venit zilnic" : "Daily income"} text={language === "ro" ? "Plata joburilor plus waiting plătit către tine." : "Job payments plus waiting paid to you."}><ResponsiveContainer width="100%" height={270}><BarChart data={dailyData}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="label"/><YAxis/><Tooltip formatter={(value: number) => money(value)}/><Legend/><Bar stackId="income" dataKey="jobIncome" name={language === "ro" ? "Plată joburi" : "Job pay"} fill="#43d7ff"/><Bar stackId="income" dataKey="waitingIncome" name={language === "ro" ? "Waiting plătit" : "Paid waiting"} fill="#ffb84d" radius={[5,5,0,0]}/></BarChart></ResponsiveContainer></ChartPanel>
-      <ChartPanel title={language === "ro" ? "Câștig pe oră" : "Earnings per hour"} text={language === "ro" ? "Folosește ora de început și ora de sfârșit. Pentru ziua curentă calculează până acum." : "Uses start and finish time. For today it calculates up to now."}><ResponsiveContainer width="100%" height={270}><AreaChart data={dailyData}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="label"/><YAxis/><Tooltip formatter={(value: number) => `${money(value)}/h`}/><Area type="monotone" dataKey="hourly" name={language === "ro" ? "£ pe oră" : "£ per hour"} stroke="#23e6a8" fill="#23e6a833" strokeWidth={3}/></AreaChart></ResponsiveContainer></ChartPanel>
-      <ChartPanel title={language === "ro" ? "Ora începerii" : "Work start time"} text={language === "ro" ? "Arată ora salvată pentru fiecare zi lucrată." : "Shows the saved start time for every worked day."}><ResponsiveContainer width="100%" height={270}><LineChart data={dailyData}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="label"/><YAxis domain={[0,24]} tickFormatter={value => timeLabel(Number(value))}/><Tooltip formatter={(value: number) => timeLabel(value)}/><Line connectNulls type="monotone" dataKey="startHour" name={language === "ro" ? "Ora începutului" : "Start time"} stroke="#8c7cff" strokeWidth={3}/></LineChart></ResponsiveContainer></ChartPanel>
-      <ChartPanel title={language === "ro" ? "Waiting, venit plătit" : "Waiting, paid income"} text={language === "ro" ? "Waiting este venit către tine. Nu apare în cheltuieli." : "Waiting is income paid to you. It is not treated as an expense."}><div className="intel-waiting-total"><Hourglass/><span><small>{language === "ro" ? "WAITING ESTIMAT" : "ESTIMATED WAITING"}</small><strong>{money(waitingExpected)}</strong></span><span><small>{language === "ro" ? "WAITING PLĂTIT" : "PAID WAITING"}</small><strong>{money(waitingPaid)}</strong></span></div><ResponsiveContainer width="100%" height={190}><BarChart data={dailyData}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="label"/><YAxis/><Tooltip formatter={(value: number) => money(value)}/><Bar dataKey="waitingIncome" name={language === "ro" ? "Waiting plătit" : "Paid waiting"} fill="#ffb84d" radius={[5,5,0,0]}/></BarChart></ResponsiveContainer></ChartPanel>
-      <ChartPanel wide title={language === "ro" ? "Combustibil pe mașină" : "Fuel per car"} text={language === "ro" ? "Informativ din PDF. Este plătit cu cardul companiei și nu intră în cheltuielile tale." : "Information from the PDF. It is paid with the company card and excluded from your expenses."}>{fuelData.length ? <><ResponsiveContainer width="100%" height={280}><BarChart data={fuelData.slice(0,12)}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="registration"/><YAxis/><Tooltip formatter={(value: number) => money(value)}/><Bar dataKey="fuel" name={language === "ro" ? "Combustibil £" : "Fuel £"} fill="#f3b64a" radius={[5,5,0,0]}/></BarChart></ResponsiveContainer><div className="intel-fuel-table"><div><span>{language === "ro" ? "Mașină" : "Car"}</span><span>Job Ref</span><span>{language === "ro" ? "Mile" : "Miles"}</span><span>{language === "ro" ? "Combustibil" : "Fuel"}</span><span>£/mi</span></div>{fuelData.slice(0,10).map(row => <div key={row.jobRef}><span><strong>{row.registration}</strong><small>{row.car}</small></span><span>{row.jobRef}</span><span>{number(row.miles)}</span><span>{money(row.fuel)}</span><span>{row.miles ? money(row.perMile) : "—"}</span></div>)}</div></> : <Empty language={language}/>}</ChartPanel>
-      <ChartPanel title={language === "ro" ? "Mașini și mile" : "Cars and miles"} text={language === "ro" ? "Volumul de lucru pentru fiecare zi." : "Daily work volume."}><ResponsiveContainer width="100%" height={270}><BarChart data={dailyData}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="label"/><YAxis/><Tooltip/><Legend/><Bar dataKey="jobs" name={language === "ro" ? "Mașini" : "Cars"} fill="#23e6a8"/><Bar dataKey="miles" name={language === "ro" ? "Mile" : "Miles"} fill="#43d7ff" radius={[5,5,0,0]}/></BarChart></ResponsiveContainer></ChartPanel>
-      <ChartPanel title={language === "ro" ? "Datele mele, PDF și combinat" : "My data, PDF and combined"} text={language === "ro" ? "Compară venitul, costurile și rezultatul fără dubluri." : "Compares income, costs and the deduplicated result."}><ResponsiveContainer width="100%" height={270}><BarChart data={sourceData}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="name"/><YAxis/><Tooltip formatter={(value: number) => money(value)}/><Legend/><Bar dataKey="venit" fill="#43d7ff"/><Bar dataKey="costuri" fill="#ff5c85"/><Bar dataKey="net" fill="#23e6a8" radius={[5,5,0,0]}/></BarChart></ResponsiveContainer></ChartPanel>
-      <ChartPanel title={language === "ro" ? "Costuri și rambursări" : "Costs and reimbursements"} text={language === "ro" ? "Combustibilul companiei este exclus din acest calcul." : "Company fuel is excluded from this calculation."}><ResponsiveContainer width="100%" height={270}><BarChart data={expenseData}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="name"/><YAxis/><Tooltip formatter={(value: number) => money(value)}/><Bar dataKey="value" name="£" fill="#ff5c85" radius={[5,5,0,0]}/></BarChart></ResponsiveContainer></ChartPanel>
-      <ChartPanel title={language === "ro" ? "Rute după £ pe milă" : "Routes by £ per mile"} text={language === "ro" ? "Compară eficiența rutelor livrate." : "Compares delivered route efficiency."}>{routes.length ? <ResponsiveContainer width="100%" height={270}><BarChart layout="vertical" data={routes}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number"/><YAxis type="category" dataKey="route" width={120}/><Tooltip formatter={(value: number) => money(value)}/><Bar dataKey="perMile" name="£/mi" fill="#8c7cff" radius={[0,5,5,0]}/></BarChart></ResponsiveContainer> : <Empty language={language}/>}</ChartPanel>
-    </section>
-  </div>;
+export function InsightsPage(){
+ const {data,language}=useData();
+ const [scope,setScope]=useState<Scope>("week");const [anchor,setAnchor]=useState(todayIso());const [customStart,setCustomStart]=useState("");const [customEnd,setCustomEnd]=useState("");
+ const range=useMemo(()=>rangeFor(scope,anchor,customStart,customEnd),[scope,anchor,customStart,customEnd]);
+ const jobs=useMemo(()=>data.jobs.filter(job=>job.status==="delivered"&&sourceDate(job)>=range.start&&sourceDate(job)<=range.end),[data.jobs,range]);
+ const expenses=useMemo(()=>data.expenses.filter(row=>row.date>=range.start&&row.date<=range.end&&row.source==="manual"),[data.expenses,range]);
+ const logs=useMemo(()=>(data.dailyLogs??[]).filter(row=>row.date>=range.start&&row.date<=range.end),[data.dailyLogs,range]);
+ const carousels=useMemo(()=>buildCharts(jobs,expenses,logs,language),[jobs,expenses,logs,language]);
+ return <>
+  <PageHeader eyebrow="A.R.I.S. 1.5.7" title={L(language,"Analiză operațională","Operational intelligence")} subtitle={L(language,"15 grafice reale în trei carusele. Valorile lipsă sunt explicate, nu inventate.","15 real-data charts in three carousels. Missing values are explained, never invented.")}/>
+  <section className="report-toolbar"><div className="segmented">{(["week","month","custom"] as Scope[]).map(value=><button key={value} className={scope===value?"active":""} onClick={()=>setScope(value)}>{value==="week"?L(language,"Săptămână","Week"):value==="month"?L(language,"Lună","Month"):L(language,"Personalizat","Custom")}</button>)}</div><div className="period-navigation"><input type="date" value={anchor} onChange={event=>setAnchor(event.target.value)}/>{scope==="custom"&&<><input type="date" value={customStart} onChange={event=>setCustomStart(event.target.value)}/><input type="date" value={customEnd} onChange={event=>setCustomEnd(event.target.value)}/></>}</div></section>
+  <div className="carousel-stack">{carousels.map((charts,index)=><ChartCarousel key={index} charts={charts} label={L(language,`Carusel ${index+1}`,`Carousel ${index+1}`)} language={language}/>)}</div>
+ </>;
 }
 
-function buildDailyRows(dates: string[], manualJobs: Job[], pdfJobs: PayslipJob[], logs: DailyLog[], source: SourceChoice, language: Language): DailyRow[] {
-  return dates.map(date => {
-    const manualMap = new Map(manualJobs.filter(job => (job.deliveryDate || job.collectionDate) === date).map(job => [sourceKey(job.jobRef), job]));
-    const pdfMap = new Map(pdfJobs.filter(job => job.date === date).map(job => [sourceKey(job.jobRef), job]));
-    const refs = source === "manual" ? [...manualMap.keys()] : source === "pdf" ? [...pdfMap.keys()] : [...new Set([...manualMap.keys(), ...pdfMap.keys()])];
-    let miles = 0; let jobIncome = 0; let waitingIncome = 0;
-    refs.forEach(ref => {
-      const own = manualMap.get(ref); const statement = pdfMap.get(ref);
-      if (source === "manual") { miles += own ? jobMiles(own) : 0; jobIncome += own ? own.tariffPaid ?? tariffForMiles(jobMiles(own)) : 0; waitingIncome += own?.waitingPaid ?? own?.waitingEstimated ?? 0; }
-      else if (source === "pdf") { miles += statement?.miles ?? 0; jobIncome += statement?.paid ?? 0; }
-      else { miles += statement?.miles ?? (own ? jobMiles(own) : 0); jobIncome += statement?.paid ?? (own ? own.tariffPaid ?? tariffForMiles(jobMiles(own)) : 0); waitingIncome += own?.waitingPaid ?? own?.waitingEstimated ?? 0; }
-    });
-    const log = logs.find(item => item.date === date); const workMinutes = durationMinutes(log?.leftHomeTime ?? "", log?.returnedHomeTime ?? "", date); const totalIncome = jobIncome + waitingIncome;
-    return { date, label: formatShortDate(date, language), jobs: refs.length, miles: round2(miles), jobIncome: round2(jobIncome), waitingIncome: round2(waitingIncome), totalIncome: round2(totalIncome), workHours: round2(workMinutes / 60), hourly: workMinutes ? round2(totalIncome / (workMinutes / 60)) : 0, startHour: decimalTime(log?.leftHomeTime ?? "") };
-  });
+function buildCharts(jobs:Job[],expenses:ReturnType<typeof useData>["data"]["expenses"],logs:NonNullable<ReturnType<typeof useData>["data"]["dailyLogs"]>,language:Language):ChartSpec[][]{
+ const fuel=jobs.filter(j=>Number(j.fuelEntry?.totalCost)>0).map(j=>({label:carLabel(j),value:Number(j.fuelEntry?.totalCost)}));
+ const charging=jobs.filter(j=>Number(j.chargingEntry?.totalCost)>0).map(j=>({label:carLabel(j),value:Number(j.chargingEntry?.totalCost)}));
+ const costMile=jobs.map(j=>{const cost=Number(j.fuelEntry?.totalCost||0)+Number(j.chargingEntry?.totalCost||0);const miles=jobMiles(j);return cost>0&&miles>0?{label:carLabel(j),value:round(cost/miles)}:null}).filter(Boolean) as ChartDatum[];
+ const categories=group(expenses.filter(e=>e.actualCost>0).map(e=>({label:e.category||L(language,"Altele","Other"),value:e.actualCost})),["value"]);
+ const payerRows=[{label:L(language,"Plătit de mine","Paid by me"),value:expenses.reduce((s,e)=>s+e.actualCost,0)},{label:L(language,"Companie","Company"),value:jobs.reduce((s,j)=>s+(j.fuelEntry?.payer==="company"?Number(j.fuelEntry.totalCost||0):0)+(j.chargingEntry?.payer==="company"?Number(j.chargingEntry.totalCost||0):0),0)},{label:L(language,"Rambursat","Reimbursed"),value:expenses.reduce((s,e)=>s+e.approved,0)}].filter(row=>row.value>0);
+ const daily=group(jobs.map(j=>({label:formatShortDate(sourceDate(j),language),cars:1,miles:jobMiles(j),income:Number(j.tariffPaid??tariffForMiles(jobMiles(j)))})),["cars","miles","income"]);
+ const hours=logs.map(log=>{const [sh,sm]=log.leftHomeTime.split(":").map(Number);const [eh,em]=log.returnedHomeTime.split(":").map(Number);let minutes=(eh*60+em)-(sh*60+sm);if(minutes<0)minutes+=1440;return{label:formatShortDate(log.date,language),hours:round(minutes/60),start:round(sh+sm/60)}}).filter(row=>row.hours>0);
+ const hourly=hours.map(row=>{const income=Number(daily.find(item=>item.label===row.label)?.income??0);return income>0?{label:row.label,value:round(income/row.hours)}:null}).filter(Boolean) as ChartDatum[];
+ const waiting=logs.filter(log=>log.waitingMinutes>0).map(log=>({label:formatShortDate(log.date,language),minutes:log.waitingMinutes,income:jobs.filter(job=>sourceDate(job)===log.date).reduce((s,j)=>s+Number(j.waitingPaid||0),0)}));
+ const routes=jobs.map(j=>{const miles=jobMiles(j);const income=Number(j.tariffPaid??tariffForMiles(miles));return miles>0&&income>0?{label:`${j.pickupTown||"?"} → ${j.deliveryTown||"?"}`,value:round(income/miles)}:null}).filter(Boolean) as ChartDatum[];
+ const milesCompare=jobs.filter(j=>j.actualMiles!==null&&j.payslipMiles!==null).map(j=>({label:carLabel(j),actual:Number(j.actualMiles),paid:Number(j.payslipMiles)}));
+ const consumed=jobs.map(j=>{const result=calculateConsumption(j);return result&&!result.rangeIncreased?{label:carLabel(j),value:round(result.rangeUsed)}:null}).filter(Boolean) as ChartDatum[];
+ const efficient=jobs.map(j=>{const result=calculateConsumption(j);return result&&!result.rangeIncreased?{label:carLabel(j),value:round(result.efficiency)}:null}).filter(Boolean) as ChartDatum[];
+ const before9=group(jobs.filter(j=>j.firstDeliveryBefore9!==null).map(j=>({label:formatShortDate(sourceDate(j),language),success:j.firstDeliveryBefore9?1:0,total:1})),["success","total"]).map(row=>({...row,value:round(Number(row.success)/Number(row.total)*100)}));
+ const spec=(title:string,subtitle:string,data:ChartDatum[],missing:string,keys=[{key:"value",label:title,color:"#51e4ff"}],unit="",kind:"line"|"bar"="bar"):ChartSpec=>({title,subtitle,data,missing,keys,unit,kind});
+ return [[
+  spec(L(language,"Combustibil per mașină","Fuel per car"),L(language,"Costul real introdus","Entered actual cost"),fuel,L(language,"Lipsește costul combustibilului pentru vehicule.","Vehicle fuel cost is missing."),undefined,"£"),
+  spec(L(language,"Încărcare per vehicul electric","Charging cost per electric vehicle"),L(language,"Costul fiecărei încărcări","Cost of each charge"),charging,L(language,"Lipsește costul încărcării electrice.","Electric charging cost is missing."),undefined,"£"),
+  spec(L(language,"Combustibil sau încărcare per milă","Fuel or charging cost per mile"),L(language,"Cost real împărțit la mile reale","Actual cost divided by actual miles"),costMile,L(language,"Lipsesc costul energiei sau milele vehiculului.","Energy cost or vehicle miles are missing."),undefined,"£/mi"),
+  spec(L(language,"Cheltuieli pe categorie","Expenses by category"),L(language,"Doar cheltuieli reale","Actual expenses only"),categories,L(language,"Nu există cheltuieli introduse în perioada aleasă.","No expenses are entered for this period."),undefined,"£"),
+  spec(L(language,"Plătit de mine, companie și rambursat","Paid by me, company and reimbursed"),L(language,"Sursa costului","Cost source"),payerRows,L(language,"Lipsesc costurile și rambursările.","Costs and reimbursements are missing."),undefined,"£")
+ ],[
+  spec(L(language,"Mașini și mile","Cars and miles"),L(language,"Activitate zilnică","Daily activity"),daily,L(language,"Nu există joburi livrate.","No delivered jobs."),[{key:"cars",label:L(language,"Mașini","Cars"),color:"#51e4ff"},{key:"miles",label:L(language,"Mile","Miles"),color:"#9b7bff"}],"","line"),
+  spec(L(language,"Venit zilnic","Daily income"),L(language,"Tarif job pe zi","Job pay per day"),daily,L(language,"Lipsesc joburile sau tariful plătit.","Jobs or paid tariff are missing."),[{key:"income",label:L(language,"Venit","Income"),color:"#55e6a5"}],"£","line"),
+  spec(L(language,"Câștig pe oră","Earnings per hour"),L(language,"Venit împărțit la timpul de lucru","Income divided by work time"),hourly,L(language,"Lipsește ora de început, ora de final sau venitul zilnic.","Start time, finish time or daily income is missing."),undefined,"£/h","line"),
+  spec(L(language,"Așteptare și venit din așteptare","Waiting time and waiting income"),L(language,"Minute și suma plătită","Minutes and paid amount"),waiting,L(language,"Lipsesc minutele de așteptare sau plata pentru așteptare.","Waiting minutes or waiting payment is missing."),[{key:"minutes",label:L(language,"Minute","Minutes"),color:"#ffca67"},{key:"income",label:L(language,"Venit £","Income £"),color:"#55e6a5"}]),
+  spec(L(language,"Ore de lucru și ora de plecare","Working hours and start time"),L(language,"Din jurnalul zilnic","From daily log"),hours,L(language,"Lipsește ora de început sau de final.","Start or finish time is missing."),[{key:"hours",label:L(language,"Ore lucrate","Hours worked"),color:"#51e4ff"},{key:"start",label:L(language,"Ora de plecare","Start time"),color:"#9b7bff"}],"h","line")
+ ],[
+  spec(L(language,"Rute după £ pe milă","Routes by £ per mile"),L(language,"Eficiența financiară a rutei","Route financial efficiency"),routes,L(language,"Lipsesc ruta, milele sau plata jobului.","Route, miles or job payment is missing."),undefined,"£/mi"),
+  spec(L(language,"Mile reale față de mile plătite","Actual miles vs paid miles"),L(language,"Compară distanțele per vehicul","Compare distance per vehicle"),milesCompare,L(language,"Lipsesc milele finale sau milele din PDF.","Final miles or PDF paid miles are missing."),[{key:"actual",label:L(language,"Reale","Actual"),color:"#51e4ff"},{key:"paid",label:L(language,"Plătite","Paid"),color:"#55e6a5"}]),
+  spec(L(language,"Range consumat per vehicul","Range consumed per vehicle"),L(language,"Range colectare minus range livrare","Collection range minus delivery range"),consumed,L(language,"Lipsește range-ul la colectare sau la livrare.","Collection or delivery range is missing."),undefined,"mi"),
+  spec(L(language,"Eficiența vehiculului","Vehicle efficiency"),L(language,"Mile reale raportate la range consumat","Actual miles against range consumed"),efficient,L(language,"Lipsesc range-ul și milele reale.","Range and actual miles are missing."),undefined,"%"),
+  spec(L(language,"Prima livrare înainte de 09:00","First delivery before 09:00"),L(language,"Rata de succes zilnică","Daily success rate"),before9,L(language,"Nu există răspunsuri pentru prima livrare înainte de 09:00.","No first-delivery-before-09:00 answers exist."),undefined,"%","line")
+ ]];
 }
 
-function Calculation({ icon, label, value }: { icon: ReactNode; label: string; value: string }) { return <article>{icon}<span><small>{label}</small><strong>{value}</strong></span></article>; }
-function ChartPanel({ title, text, children, wide = false }: { title: string; text: string; children: ReactNode; wide?: boolean }) { return <article className={`intel-chart-panel ${wide ? "wide" : ""}`}><header><div><h2>{title}</h2><p>{text}</p></div><Gauge/></header>{children}</article>; }
-function Empty({ language }: { language: Language }) { return <div className="intel-empty">{language === "ro" ? "Nu există date pentru perioada selectată." : "No data for the selected period."}</div>; }
+function ChartCarousel({charts,label,language}:{charts:ChartSpec[];label:string;language:Language}){const [index,setIndex]=useState(0);const start=useRef(0);const move=(amount:number)=>setIndex(current=>(current+amount+charts.length)%charts.length);return <section className="aris-carousel"><div className="carousel-head"><div><span className="eyebrow">{label}</span><h2>{charts[index].title}</h2></div><div className="carousel-nav"><button className="icon-button" onClick={()=>move(-1)} aria-label={L(language,"Grafic anterior","Previous chart")}><ChevronLeft/></button><strong>{index+1} / {charts.length}</strong><button className="icon-button" onClick={()=>move(1)} aria-label={L(language,"Grafic următor","Next chart")}><ChevronRight/></button></div></div><div className="carousel-viewport" onPointerDown={event=>{start.current=event.clientX}} onPointerUp={event=>{const delta=event.clientX-start.current;if(Math.abs(delta)>45)move(delta<0?1:-1)}}><div className="carousel-track" style={{transform:`translateX(-${index*100}%)`}}>{charts.map(chart=><div className="chart-slide" key={chart.title}><ChartCard chart={chart}/></div>)}</div></div><div className="carousel-dots">{charts.map((_,dot)=><button key={dot} className={dot===index?"active":""} onClick={()=>setIndex(dot)} aria-label={`${dot+1}`}/>)}</div></section>}
+
+function ChartCard({chart}:{chart:ChartSpec}){return <article className="chart-card"><header><div><h3>{chart.title}</h3><p>{chart.subtitle}</p></div></header>{chart.data.length?<ResponsiveContainer width="100%" height={260}>{chart.kind==="line"?<LineChart data={chart.data} margin={{left:0,right:12,bottom:24}}><CartesianGrid strokeDasharray="3 3" opacity={.2}/><XAxis dataKey="label" angle={-20} textAnchor="end" height={58}/><YAxis/><Tooltip formatter={(value:number)=>`${moneyOrNumber(value,chart.unit)}`}/><Legend/>{chart.keys.map(item=><Line type="monotone" key={item.key} dataKey={item.key} name={item.label} stroke={item.color} strokeWidth={3}/>)}</LineChart>:<BarChart data={chart.data} margin={{left:0,right:12,bottom:24}}><CartesianGrid strokeDasharray="3 3" opacity={.2}/><XAxis dataKey="label" angle={-20} textAnchor="end" height={58}/><YAxis/><Tooltip formatter={(value:number)=>`${moneyOrNumber(value,chart.unit)}`}/><Legend/>{chart.keys.map(item=><Bar key={item.key} dataKey={item.key} name={item.label} fill={item.color} radius={[6,6,0,0]}/>)}</BarChart>}</ResponsiveContainer>:<div className="chart-empty"><div><strong>{chart.missing}</strong><p>{chart.subtitle}</p></div></div>}</article>}
+const moneyOrNumber=(value:number,unit="")=>unit.startsWith("£")?`${money(value)}${unit==="£"?"":unit.slice(1)}`:`${round(value)}${unit?` ${unit}`:""}`;

@@ -12,7 +12,7 @@ export const makeWorkbook = (data: AppData, language: Language) => {
   const expenses = [["ID", "Job Ref", ro ? "Data" : "Date", ro ? "Categorie" : "Category", ro ? "Cost" : "Cost", "JSON"], ...data.expenses.map(item => [item.id, item.jobRef, item.date, item.category, item.actualCost, JSON.stringify(item)])];
   const payslips = [["ID", ro ? "Săptămână" : "Week", ro ? "Total plătit" : "Total paid", "JSON"], ...data.payslips.map(item => [item.id, item.weekStart, item.totalPaid, JSON.stringify(item)])];
   const electric = [["Job Ref", ro ? "Tip" : "Type", ro ? "Cost" : "Cost", ro ? "Durată minute" : "Duration minutes", "kW", "p/kWh", ro ? "Litri" : "Litres", ro ? "Preț/litru" : "Price/litre"], ...data.jobs.filter(job => job.chargingEntry || job.fuelEntry).map(job => [job.jobRef, job.vehicleType ?? "unspecified", job.chargingEntry?.totalCost ?? job.fuelEntry?.totalCost ?? "", job.chargingEntry?.durationMinutes ?? "", job.chargingEntry?.averageKw ?? "", job.chargingEntry?.tariffPencePerKwh ?? "", job.fuelEntry?.litres ?? "", job.fuelEntry?.pricePerLitre ?? ""])];
-  const summary = [[ro ? "A.R.I.S. Export" : "A.R.I.S. Export", "1.5.6"], [ro ? "Nume" : "Name", data.profile?.name ?? ""], [ro ? "Joburi" : "Jobs", data.jobs.length], [ro ? "Cheltuieli" : "Expenses", data.expenses.length], [ro ? "Fluturași" : "Payslips", data.payslips.length], ...appRow(data)];
+  const summary = [[ro ? "A.R.I.S. Export" : "A.R.I.S. Export", "1.5.7"], [ro ? "Nume" : "Name", data.profile?.name ?? ""], [ro ? "Joburi" : "Jobs", data.jobs.length], [ro ? "Cheltuieli" : "Expenses", data.expenses.length], [ro ? "Fluturași" : "Payslips", data.payslips.length], ...appRow(data)];
   const settings = [[ro ? "Setare" : "Setting", ro ? "Valoare" : "Value"], ["profile", JSON.stringify(data.profile ?? {})], ["theme", data.themeMode ?? "dark"], ["tax", JSON.stringify(data.taxSettings ?? {})]];
   const sheets = [["Summary", summary], ["Jobs", jobs], ["Expenses", expenses], ["Payslips", payslips], ["Electric", electric], ["Settings", settings]] as const;
   const files = [
@@ -32,7 +32,7 @@ export const readWorkbook = async (file: File) => {
 };
 
 export const makeBackup = async (data: AppData, language: Language) => {
-  const workbook = new Uint8Array(await makeWorkbook(data, language).arrayBuffer()); const files = [{ name: "ARIS_data.xlsx", data: workbook }, { name: "manifest.json", data: textBytes(JSON.stringify({ app: "ARIS", version: "1.5.6", createdAt: new Date().toISOString() }, null, 2)) }];
+  const workbook = new Uint8Array(await makeWorkbook(data, language).arrayBuffer()); const files = [{ name: "ARIS_data.xlsx", data: workbook }, { name: "manifest.json", data: textBytes(JSON.stringify({ app: "ARIS", version: "1.5.7", createdAt: new Date().toISOString() }, null, 2)) }];
   for (const payslip of data.payslips) { const pdf = await getPayslipPdf(payslip.id); if (pdf) files.push({ name: `payslips/${payslip.id}.pdf`, data: new Uint8Array(await pdf.arrayBuffer()) }); }
   return createZip(files);
 };

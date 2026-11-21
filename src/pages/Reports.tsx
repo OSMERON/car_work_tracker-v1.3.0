@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronLeft, ChevronRight, FileCheck2, Route } from "lucide-react";
+import { ArrowLeft, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, FileCheck2, Route } from "lucide-react";
 import { useMemo, useState } from "react";
 import { PageHeader, StatCard, money, number } from "../components/Ui";
 import { useData } from "../store/DataContext";
@@ -9,64 +9,33 @@ import { jobRegistrations } from "../lib/jobProtocols";
 import { VehiclePlate } from "../components/VehiclePlate";
 
 type ViewMode = "day" | "week" | "month";
+type Rows = ReturnType<typeof dailyWorkRows>;
+const moveMonth = (iso:string, amount:number) => { const value=new Date(`${iso}T12:00:00`); value.setDate(1); value.setMonth(value.getMonth()+amount); return value.toLocaleDateString("en-CA"); };
+const monthName = (month:string, language:"ro"|"en") => new Intl.DateTimeFormat(language === "ro" ? "ro-RO" : "en-GB", { month:"long" }).format(new Date(`${month}-01T12:00:00`));
+const totalsFor = (rows:Rows) => rows.reduce((total,row)=>({jobs:total.jobs+row.jobs,miles:total.miles+row.miles,jobPay:total.jobPay+row.jobPay,reimbursements:total.reimbursements+row.reimbursements,costs:total.costs+row.costs}),{jobs:0,miles:0,jobPay:0,reimbursements:0,costs:0});
 
-const moveMonth = (iso: string, amount: number) => {
-  const date = new Date(`${iso}T12:00:00`);
-  date.setDate(1);
-  date.setMonth(date.getMonth() + amount);
-  return date.toLocaleDateString("en-CA");
-};
-
-export function ReportsPage() {
-  const { data, language } = useData();
-  const [mode, setMode] = useState<ViewMode>("week");
-  const [focus, setFocus] = useState(todayIso());
-  const range = useMemo(() => {
-    if (mode === "day") return { start: focus, end: focus };
-    if (mode === "week") {
-      const start = mondayOf(focus);
-      return { start, end: addDays(start, 6) };
-    }
-    return monthBounds(focus);
-  }, [focus, mode]);
-  const rows = dailyWorkRows(data, range.start, range.end);
-  const totals = rows.reduce((result, row) => ({
-    jobs: result.jobs + row.jobs,
-    miles: result.miles + row.miles,
-    jobPay: result.jobPay + row.jobPay,
-    reimbursements: result.reimbursements + row.reimbursements,
-    costs: result.costs + row.costs
-  }), { jobs: 0, miles: 0, jobPay: 0, reimbursements: 0, costs: 0 });
-  const pdfTotal = payslipTotalForRange(data, range.start, range.end);
-  const dayJobs = data.jobs.filter(job => job.collectionDate === focus || job.deliveryDate === focus);
-
-  const move = (direction: number) => {
-    if (mode === "day") setFocus(addDays(focus, direction));
-    else if (mode === "week") setFocus(addDays(focus, direction * 7));
-    else setFocus(moveMonth(focus, direction));
-  };
-
-  const title = mode === "day" ? formatDate(focus, language) : mode === "week" ? `${formatDate(range.start, language)} - ${formatDate(range.end, language)}` : new Intl.DateTimeFormat(language === "ro" ? "ro-RO" : "en-GB", { month: "long", year: "numeric" }).format(new Date(`${focus}T12:00:00`));
-
+export function ReportsPage(){
+  const {data,language}=useData();
+  const [mode,setMode]=useState<ViewMode>("week");
+  const [focus,setFocus]=useState(todayIso());
+  const [openMonth,setOpenMonth]=useState<string|null>(null);
+  const range=useMemo(()=>mode==="day"?{start:focus,end:focus}:mode==="week"?{start:mondayOf(focus),end:addDays(mondayOf(focus),6)}:openMonth?monthBounds(`${openMonth}-01`):{start:`${focus.slice(0,4)}-01-01`,end:`${focus.slice(0,4)}-12-31`},[mode,focus,openMonth]);
+  const rows=dailyWorkRows(data,range.start,range.end); const totals=totalsFor(rows); const pdfTotal=payslipTotalForRange(data,range.start,range.end);
+  const dayJobs=data.jobs.filter(job=>job.collectionDate===focus||job.deliveryDate===focus);
+  const move=(direction:number)=>{if(mode==="day")setFocus(addDays(focus,direction));else if(mode==="week")setFocus(addDays(focus,direction*7));else if(openMonth)setOpenMonth(moveMonth(`${openMonth}-01`,direction).slice(0,7));else setFocus(`${Number(focus.slice(0,4))+direction}-01-01`);};
+  const title=mode==="day"?formatDate(focus,language):mode==="week"?`${formatDate(range.start,language)} - ${formatDate(range.end,language)}`:openMonth?`${monthName(openMonth,language)} ${openMonth.slice(0,4)}`:focus.slice(0,4);
+  const setView=(next:ViewMode)=>{setMode(next);if(next!=="month")setOpenMonth(null);};
   return <>
-    <PageHeader eyebrow={language === "ro" ? "Din joburi și PDF-uri" : "From jobs and PDFs"} title={language === "ro" ? "Calendar și rapoarte" : "Calendar and reports"} subtitle={language === "ro" ? "Vezi separat fiecare zi, fiecare săptămână și fiecare lună." : "Review every day, week and month separately."}/>
-    <section className="report-toolbar">
-      <div className="segmented"><button className={mode === "day" ? "active" : ""} onClick={() => setMode("day")}>{language === "ro" ? "Zi" : "Day"}</button><button className={mode === "week" ? "active" : ""} onClick={() => setMode("week")}>{language === "ro" ? "Săptămână" : "Week"}</button><button className={mode === "month" ? "active" : ""} onClick={() => setMode("month")}>{language === "ro" ? "Lună" : "Month"}</button></div>
-      <div className="period-navigation"><button className="icon-button" onClick={() => move(-1)}><ChevronLeft/></button><strong>{title}</strong><button className="icon-button" onClick={() => move(1)}><ChevronRight/></button><input type="date" value={focus} onChange={event => setFocus(event.target.value)}/></div>
-    </section>
-    <section className="stats-grid report-stats"><StatCard label={language === "ro" ? "Joburi livrate" : "Delivered jobs"} value={String(totals.jobs)} tone="green"/><StatCard label={language === "ro" ? "Mile" : "Miles"} value={number(totals.miles)}/><StatCard label={language === "ro" ? "Plată joburi din PDF" : "PDF job pay"} value={money(totals.jobPay)} tone="amber"/><StatCard label={language === "ro" ? "Rambursări" : "Reimbursements"} value={money(totals.reimbursements)}/><StatCard label={language === "ro" ? "Costuri reale" : "Actual costs"} value={money(totals.costs)}/><StatCard label={language === "ro" ? "Total fluturași" : "Payslip total"} value={money(pdfTotal)} tone="green"/></section>
-    {mode === "month" ? <MonthCalendar rows={rows} month={focus.slice(0, 7)} language={language} onPick={date => { setFocus(date); setMode("day"); }}/> : mode === "week" ? <div className="week-day-grid">{rows.map(row => <DayCard key={row.date} row={row} language={language} onPick={() => { setFocus(row.date); setMode("day"); }}/>)}</div> : <section className="section-block"><div className="section-title"><div><h2>{formatDate(focus, language)}</h2><p>{dayJobs.length} {language === "ro" ? "înregistrări" : "records"}</p></div></div>{dayJobs.length ? <div className="report-job-list">{dayJobs.map(job => <article key={job.id}><VehiclePlate registration={jobRegistrations(job, true).join(" / ")} vehicleType={job.vehicleType} compact/><div><strong>{job.jobRef || job.makeModel}</strong><small>{job.protocol === "autorola" && !job.pickupTown ? (language === "ro" ? "Locație clasificată" : "Classified location") : job.pickupTown || "?"} → {job.protocol === "autorola" && !job.deliveryTown ? (language === "ro" ? "Locație clasificată" : "Classified location") : job.deliveryTown || "?"}</small></div><span><Route size={15}/>{number(jobMiles(job))} mi</span></article>)}</div> : <div className="empty">{language === "ro" ? "Nu există joburi pentru această zi." : "No jobs for this day."}</div>}</section>}
-    <div className="report-explanation"><FileCheck2/><div><strong>{language === "ro" ? "Cum sunt împărțite sumele" : "How amounts are allocated"}</strong><p>{language === "ro" ? "Plata fiecărui job și rambursările folosesc data din PDF. Reward, bonus, deduceri și taxa administrativă rămân la nivelul întregii săptămâni, în totalul fluturașului." : "Each job payment and reimbursement uses its PDF date. Reward, bonus, deductions and the administration fee stay at whole-week level in the payslip total."}</p></div></div>
+    <PageHeader eyebrow={language==="ro"?"Din joburi și PDF-uri":"From jobs and PDFs"} title={language==="ro"?"Calendar și rapoarte":"Calendar and reports"} subtitle={language==="ro"?"Ziua rămâne detaliată, săptămâna are 7 carduri, iar anul afișează toate lunile.":"The day stays detailed, the week has 7 cards, and the year shows all months."}/>
+    <section className="report-toolbar"><div className="segmented"><button className={mode==="day"?"active":""} onClick={()=>setView("day")}>{language==="ro"?"Zi":"Day"}</button><button className={mode==="week"?"active":""} onClick={()=>setView("week")}>{language==="ro"?"Săptămână":"Week"}</button><button className={mode==="month"?"active":""} onClick={()=>setView("month")}>{language==="ro"?"Luni":"Months"}</button></div><div className="period-navigation"><button className="icon-button" onClick={()=>move(-1)} aria-label={language==="ro"?"Înapoi":"Previous"}><ChevronLeft/></button><strong>{title}</strong><button className="icon-button" onClick={()=>move(1)} aria-label={language==="ro"?"Înainte":"Next"}><ChevronRight/></button>{mode!=="month"&&<input type="date" value={focus} onChange={event=>setFocus(event.target.value)}/>}</div></section>
+    <section className="stats-grid report-stats"><StatCard label={language==="ro"?"Joburi livrate":"Delivered jobs"} value={String(totals.jobs)} tone="green"/><StatCard label={language==="ro"?"Mile":"Miles"} value={number(totals.miles)}/><StatCard label={language==="ro"?"Venit joburi":"Job income"} value={money(totals.jobPay)} tone="amber"/><StatCard label={language==="ro"?"Rambursări":"Reimbursements"} value={money(totals.reimbursements)}/><StatCard label={language==="ro"?"Cheltuieli":"Expenses"} value={money(totals.costs)}/><StatCard label={language==="ro"?"Net":"Net"} value={money(totals.jobPay+totals.reimbursements-totals.costs)} tone="green"/><StatCard label={language==="ro"?"Total fluturași":"Payslip total"} value={money(pdfTotal)} tone="green"/></section>
+    {mode==="month"?(openMonth?<><button className="secondary-button" onClick={()=>setOpenMonth(null)}><ArrowLeft size={17}/>{language==="ro"?"Înapoi la cele 12 luni":"Back to 12 months"}</button><MonthCalendar rows={rows} month={openMonth} language={language} onPick={date=>{setFocus(date);setMode("day");setOpenMonth(null);}}/></>:<YearMonths year={focus.slice(0,4)} data={data} language={language} onPick={setOpenMonth}/>):mode==="week"?<div className="week-day-grid">{rows.map(row=><DayCard key={row.date} row={row} language={language} complete={(data.completedWeeks??[]).includes(mondayOf(row.date))} onPick={()=>{setFocus(row.date);setMode("day");}}/>)}</div>:<section className="section-block"><div className="section-title"><div><h2>{formatDate(focus,language)}</h2><p>{dayJobs.length} {language==="ro"?"înregistrări":"records"}</p></div></div>{dayJobs.length?<div className="report-job-list">{dayJobs.map(job=><article key={job.id}><VehiclePlate registration={jobRegistrations(job,true).join(" / ")} vehicleType={job.vehicleType} compact/><div><strong>{job.jobRef||job.makeModel}</strong><small>{job.pickupTown||"?"} → {job.deliveryTown||"?"}</small></div><span><Route size={15}/>{number(jobMiles(job))} mi</span></article>)}</div>:<div className="empty">{language==="ro"?"Nu există joburi pentru această zi.":"No jobs for this day."}</div>}</section>}
+    <div className="report-explanation"><FileCheck2/><div><strong>{language==="ro"?"Cum sunt calculate sumele":"How amounts are calculated"}</strong><p>{language==="ro"?"Fiecare zi folosește joburile și cheltuielile din acea dată. Cardurile lunare însumează toate zilele din lună.":"Each day uses jobs and expenses from its date. Monthly cards total every day in that month."}</p></div></div>
   </>;
 }
 
-function DayCard({ row, language, onPick }: { row: ReturnType<typeof dailyWorkRows>[number]; language: "ro" | "en"; onPick: () => void }) {
-  return <button className="day-report-card" onClick={onPick}><header><CalendarDays size={18}/><strong>{formatShortDate(row.date, language)}</strong></header><div><span>{language === "ro" ? "Joburi" : "Jobs"}</span><strong>{row.jobs}</strong></div><div><span>{language === "ro" ? "Mile" : "Miles"}</span><strong>{number(row.miles)}</strong></div><div><span>{language === "ro" ? "Plată joburi" : "Job pay"}</span><strong>{money(row.jobPay)}</strong></div><div><span>{language === "ro" ? "Rambursări" : "Reimbursements"}</span><strong>{money(row.reimbursements)}</strong></div></button>;
-}
+function DayCard({row,language,complete,onPick}:{row:Rows[number];language:"ro"|"en";complete:boolean;onPick:()=>void}){const net=row.jobPay+row.reimbursements-row.costs;return <button className="day-report-card" onClick={onPick}><header><CalendarDays size={18}/><strong>{formatShortDate(row.date,language)}</strong></header><div><span>{language==="ro"?"Joburi":"Jobs"}</span><strong>{row.jobs}</strong></div><div><span>{language==="ro"?"Mile":"Miles"}</span><strong>{number(row.miles)}</strong></div><div><span>{language==="ro"?"Venit":"Income"}</span><strong>{money(row.jobPay+row.reimbursements)}</strong></div><div><span>{language==="ro"?"Cheltuieli":"Expenses"}</span><strong>{money(row.costs)}</strong></div><div className="day-net"><span>Net</span><strong>{money(net)}</strong></div><small className={complete?"day-complete":"day-open"}>{complete?<><CheckCircle2 size={13}/> {language==="ro"?"Săptămână confirmată":"Week confirmed"}</>:language==="ro"?"Săptămână neconfirmată":"Week not confirmed"}</small></button>}
 
-function MonthCalendar({ rows, month, language, onPick }: { rows: ReturnType<typeof dailyWorkRows>; month: string; language: "ro" | "en"; onPick: (date: string) => void }) {
-  const first = rows[0]?.date ?? `${month}-01`;
-  const blanks = (new Date(`${first}T12:00:00`).getDay() + 6) % 7;
-  const labels = language === "ro" ? ["Lu", "Ma", "Mi", "Jo", "Vi", "Sâ", "Du"] : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  return <section className="month-calendar"><div className="month-labels">{labels.map(label => <strong key={label}>{label}</strong>)}</div><div className="month-grid">{Array.from({ length: blanks }, (_, index) => <span key={`blank-${index}`} className="month-blank"/>)}{rows.map(row => <button key={row.date} onClick={() => onPick(row.date)} className={row.jobs ? "has-work" : ""}><strong>{Number(row.date.slice(-2))}</strong>{row.jobs > 0 && <><span>{row.jobs} {language === "ro" ? "joburi" : "jobs"}</span><small>{number(row.miles)} mi</small><small>{money(row.jobPay)}</small></>}</button>)}</div></section>;
-}
+function YearMonths({year,data,language,onPick}:{year:string;data:ReturnType<typeof useData>["data"];language:"ro"|"en";onPick:(month:string)=>void}){return <section className="year-month-grid">{Array.from({length:12},(_,index)=>{const month=`${year}-${String(index+1).padStart(2,"0")}`;const bounds=monthBounds(`${month}-01`);const rows=dailyWorkRows(data,bounds.start,bounds.end);const total=totalsFor(rows);return <button className="month-summary-card" key={month} onClick={()=>onPick(month)}><strong>{monthName(month,language)}</strong><span>{total.jobs} {language==="ro"?"joburi":"jobs"} · {number(total.miles)} mi</span><b>{money(total.jobPay+total.reimbursements-total.costs)}</b><small>{language==="ro"?"Deschide calendarul":"Open calendar"}</small></button>;})}</section>}
+
+function MonthCalendar({rows,month,language,onPick}:{rows:Rows;month:string;language:"ro"|"en";onPick:(date:string)=>void}){const first=rows[0]?.date??`${month}-01`;const blanks=(new Date(`${first}T12:00:00`).getDay()+6)%7;const labels=language==="ro"?["Lu","Ma","Mi","Jo","Vi","Sâ","Du"]:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];return <section className="month-calendar"><div className="month-labels">{labels.map(label=><strong key={label}>{label}</strong>)}</div><div className="month-grid">{Array.from({length:blanks},(_,index)=><span key={index} className="month-blank"/>)}{rows.map(row=><button key={row.date} onClick={()=>onPick(row.date)} className={row.jobs?"has-work":""}><strong>{Number(row.date.slice(-2))}</strong>{row.jobs>0&&<><span>{row.jobs} {language==="ro"?"joburi":"jobs"}</span><small>{number(row.miles)} mi</small><small>{money(row.jobPay+row.reimbursements-row.costs)}</small></>}</button>)}</div></section>}

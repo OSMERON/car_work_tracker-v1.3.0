@@ -73,7 +73,13 @@ const normalizeData = (input: AppData): AppData => ({
     ...expense,
     vatAmount: expense.vatAmount ?? 0,
     vatReclaimable: expense.vatReclaimable ?? false,
-    includeInTax: expense.includeInTax ?? (expense.source === "manual" || expense.approved > 0)
+    includeInTax: expense.includeInTax ?? (expense.source === "manual" || expense.approved > 0),
+    rasCode: expense.rasCode ?? "",
+    hasTicket: expense.hasTicket ?? false,
+    reimbursementStatus: expense.reimbursementStatus ?? (expense.approved >= expense.claimed && expense.claimed > 0 ? "full" : expense.approved > 0 ? "partial" : "review"),
+    reimbursementOverride: expense.reimbursementOverride ?? null,
+    correctedByUser: expense.correctedByUser ?? false,
+    resubmittedToOffice: expense.resubmittedToOffice ?? false
   })),
   payslips: input.payslips.map(p => {
     const legacyAmount = !p.deliveriesPaid && p.deliveriesReported > 30 ? p.deliveriesReported : undefined;
@@ -209,7 +215,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
       notes: ["Imported from payslip PDF", row.actionNote].filter(Boolean).join(" · "),
       source: "payslip" as const
     })).filter((pdfExpense, pdfIndex) => {
-      const manualIndex = mergedExpenses.findIndex((expense, index) => !matchedManual.has(index) && expense.source === "manual" && expense.date === pdfExpense.date && expense.jobRef === pdfExpense.jobRef && Math.abs(expense.actualCost - pdfExpense.actualCost) < 0.01);
+      const manualIndex = mergedExpenses.findIndex((expense, index) => {
+        const manualType = `${expense.category} ${expense.description}`.toLowerCase();
+        const pdfType = `${pdfExpense.category} ${pdfExpense.description}`.toLowerCase();
+        const sameType = manualType.split(/\s+/).some(token => token.length > 2 && pdfType.includes(token));
+        return !matchedManual.has(index) && expense.source === "manual" && expense.date === pdfExpense.date && expense.jobRef === pdfExpense.jobRef && Math.abs(expense.actualCost - pdfExpense.actualCost) < 0.01 && sameType;
+      });
       if (manualIndex < 0) return true;
       const existing = mergedExpenses[manualIndex];
       matchedManual.add(manualIndex);
@@ -217,6 +228,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         ...existing,
         claimed: existing.claimed || pdfExpense.claimed,
         approved: pdfExpense.approved,
+        matchedPayslipId: item.id,
+        reimbursementStatus: pdfExpense.approved + .01 >= (existing.claimed || existing.actualCost) ? "full" : pdfExpense.approved > 0 ? "partial" : "unpaid",
         notes: [existing.notes, pdfExpense.notes].filter(Boolean).join(" · ")
       };
       return false;
@@ -226,7 +239,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       jobs,
       expenses: [...mergedExpenses, ...pdfExpenses],
       payslips: [...prev.payslips.filter(x => x.weekStart !== item.weekStart), item],
-      completedWeeks: [...new Set([...(prev.completedWeeks ?? []), item.weekStart])]
+      completedWeeks: prev.completedWeeks ?? []
     };
   });
   const removePayslip = (id: string) => setData(prev => ({ ...prev, payslips: prev.payslips.filter(x => x.id !== id) }));

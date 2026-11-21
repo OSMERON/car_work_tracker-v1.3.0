@@ -12,6 +12,7 @@ import "./insights.css";
 import "./aris-enhancements.css";
 import "./intelligence-only.css";
 import "./v156.css";
+import "./v157.css";
 
 const savedTheme = localStorage.getItem("aris-theme-mode");
 const initialMode = savedTheme === "light" ? "light" : "dark";

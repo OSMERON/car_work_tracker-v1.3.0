@@ -14,8 +14,8 @@ import { ChargingCalculator, FuelCalculator } from "../components/EnergyCalculat
 import type { ChargingEntry, FuelEntry } from "../types";
 import { calculateConsumption } from "../lib/consumption";
 
-type Row = { category: string; amount: string; claimed: string; receipt: boolean; notes: string };
-const blank = (): Row => ({ category: "Train", amount: "", claimed: "", receipt: false, notes: "" });
+type Row = { category: string; amount: string; claimed: string; receipt: boolean; hasTicket: boolean; rasCode: string; notes: string };
+const blank = (): Row => ({ category: "Train", amount: "", claimed: "", receipt: false, hasTicket: false, rasCode: "", notes: "" });
 
 export function Deliver() {
   const { data, saveJob, saveExpenses, language } = useData();
@@ -90,6 +90,9 @@ export function Deliver() {
       claimed: Number(row.claimed) || 0,
       approved: 0,
       receipt: row.receipt,
+      hasTicket: row.hasTicket,
+      rasCode: row.rasCode.replace(/[^A-Za-z0-9]/g, "").toUpperCase(),
+      reimbursementStatus: "review",
       notes: row.notes,
       source: "manual"
     }));
@@ -126,7 +129,7 @@ export function Deliver() {
 
       <div className="form-grid"><Field label={t("waitingAmount")}><input type="number" step="0.01" value={form.waiting} onChange={event => set("waiting", event.target.value)}/></Field><Field label={t("before9")}><label className="check"><input type="checkbox" checked={form.before9} onChange={event => set("before9", event.target.checked)}/><span>{language === "ro" ? "Da" : "Yes"}</span></label></Field></div>
       <div className="section-title compact"><h2>{t("expenses")}</h2><button type="button" className="secondary-button" onClick={() => setRows(current => [...current, blank()])}>+ {t("addExpense")}</button></div>
-      {rows.map((row, index) => <div className="expense-row" key={index}><select value={row.category} onChange={event => setRows(current => current.map((item, rowIndex) => rowIndex === index ? { ...item, category: event.target.value } : item))}><option>Train</option><option>Bus</option><option>Taxi</option><option>Parking</option><option>Misc</option></select><input type="number" step="0.01" placeholder={t("amount")} value={row.amount} onChange={event => setRows(current => current.map((item, rowIndex) => rowIndex === index ? { ...item, amount: event.target.value } : item))}/><input type="number" step="0.01" placeholder={t("claimed")} value={row.claimed} onChange={event => setRows(current => current.map((item, rowIndex) => rowIndex === index ? { ...item, claimed: event.target.value } : item))}/><label className="check small"><input type="checkbox" checked={row.receipt} onChange={event => setRows(current => current.map((item, rowIndex) => rowIndex === index ? { ...item, receipt: event.target.checked } : item))}/>{t("receipt")}</label>{rows.length > 1 && <button className="icon-button" type="button" onClick={() => setRows(current => current.filter((_, rowIndex) => rowIndex !== index))}>×</button>}</div>)}
+      {rows.map((row, index) => <div className="expense-row" key={index}><select value={row.category} onChange={event => setRows(current => current.map((item, rowIndex) => rowIndex === index ? { ...item, category: event.target.value } : item))}><option>Train</option><option>Bus</option><option>Taxi</option><option>Parking</option><option>Misc</option></select><input type="number" step="0.01" placeholder={t("amount")} value={row.amount} onChange={event => setRows(current => current.map((item, rowIndex) => rowIndex === index ? { ...item, amount: event.target.value } : item))}/><input type="number" step="0.01" placeholder={t("claimed")} value={row.claimed} onChange={event => setRows(current => current.map((item, rowIndex) => rowIndex === index ? { ...item, claimed: event.target.value } : item))}/>{row.category === "Taxi" ? <input aria-label="RAS code" placeholder={language === "ro" ? "Cod RAS" : "RAS code"} value={row.rasCode} onChange={event => setRows(current => current.map((item,rowIndex)=>rowIndex===index?{...item,rasCode:event.target.value.replace(/[^A-Za-z0-9]/g,"").toUpperCase()}:item))}/> : row.category === "Bus" || row.category === "Train" ? <label className="check small"><input type="checkbox" checked={row.hasTicket} onChange={event=>setRows(current=>current.map((item,rowIndex)=>rowIndex===index?{...item,hasTicket:event.target.checked}:item))}/>{language === "ro" ? "Am biletul" : "I have the ticket"}</label> : <label className="check small"><input type="checkbox" checked={row.receipt} onChange={event => setRows(current => current.map((item, rowIndex) => rowIndex === index ? { ...item, receipt: event.target.checked } : item))}/>{language === "ro" ? "Am chitanța" : "I have the receipt"}</label>}{rows.length > 1 && <button className="icon-button" type="button" onClick={() => setRows(current => current.filter((_, rowIndex) => rowIndex !== index))}>×</button>}</div>)}
       <Field label={t("notes")} wide><textarea rows={3} value={form.notes} onChange={event => set("notes", event.target.value)}/></Field>
       <div className="form-actions"><button className="primary-button" type="submit">{t("saveDelivery")}</button></div>
     </form>

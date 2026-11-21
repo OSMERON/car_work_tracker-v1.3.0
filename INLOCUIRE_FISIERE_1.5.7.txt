@@ -1,0 +1,17 @@
+A.R.I.S. 1.5.7, pachet cu fișiere de înlocuit
+
+1. Deschide proiectul original A.R.I.S. 1.5.6.
+2. Copiază toate fișierele și folderele din acest ZIP peste proiect.
+3. Păstrează exact structura folderelor.
+4. Confirmă înlocuirea fișierelor existente.
+5. Nu șterge folderul public și nu șterge alte fișiere din proiect.
+6. În terminal rulează:
+   npm install
+   npm run check
+   npm run build
+7. Trimite proiectul pe GitHub. Workflow-ul folosește Node.js 24.
+
+Datele deja salvate în aplicație rămân compatibile cu 1.5.7.
+PDF-urile și datele locale rămân pe dispozitivul unde au fost salvate.
+
+Fișierul v157.css este nou și trebuie copiat în src.
