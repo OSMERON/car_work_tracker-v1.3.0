@@ -11,11 +11,12 @@ import "./theme.css";
 import "./insights.css";
 import "./aris-enhancements.css";
 import "./intelligence-only.css";
+import "./v156.css";
 
 const savedTheme = localStorage.getItem("aris-theme-mode");
-const initialMode = savedTheme === "light" || savedTheme === "dark" ? savedTheme : "auto";
+const initialMode = savedTheme === "light" ? "light" : "dark";
 document.documentElement.dataset.themeMode = initialMode;
-document.documentElement.dataset.theme = initialMode === "auto" ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : initialMode;
+document.documentElement.dataset.theme = initialMode;
 
 ReactDOM.createRoot(document.getElementById("root")!).render(<React.StrictMode><HashRouter><DataProvider><App/></DataProvider></HashRouter></React.StrictMode>);
 window.addEventListener("load", () => {

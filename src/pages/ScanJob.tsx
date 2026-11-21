@@ -8,14 +8,14 @@ import { compressJobImage, getJobImages, saveJobImages } from "../lib/jobImageSt
 import { recognizeJobScreenshots, type JobScreenshotFields } from "../lib/jobScreenshotOcr";
 import { parseRegistrationInput, PROTOCOLS } from "../lib/jobProtocols";
 import { useData } from "../store/DataContext";
-import type { Job, JobProtocol } from "../types";
+import type { Job, JobProtocol, VehicleType } from "../types";
 
-type Draft = JobScreenshotFields & { collectionDate: string; collectionTime: string; notes: string };
+type Draft = JobScreenshotFields & { collectionDate: string; collectionTime: string; notes: string; vehicleType: VehicleType | ""; odometerStart: string; rangeStart: string };
 const emptyDraft = (): Draft => ({
   jobRef: "", rawJobRef: "", pickupCompany: "", pickupAddress: "", pickupTown: "", pickupPostcode: "",
   deliveryCompany: "", deliveryAddress: "", deliveryTown: "", deliveryPostcode: "", deliveryDate: "",
   registrations: [], makeModel: "", vehicleYear: "", vin: "", vinIncomplete: false, modelPin: "", protocol: undefined,
-  otherInfo: "", rawText: "", confidence: 0, isJobList: false, collectionDate: "", collectionTime: "", notes: ""
+  otherInfo: "", rawText: "", confidence: 0, isJobList: false, collectionDate: "", collectionTime: "", notes: "", vehicleType: "", odometerStart: "", rangeStart: ""
 });
 
 export function ScanJobPage() {
@@ -34,7 +34,7 @@ export function ScanJobPage() {
   const duplicate = useMemo(() => data.jobs.find(job => job.jobRef.trim() === draft.jobRef.trim() && draft.jobRef.trim()), [data.jobs, draft.jobRef]);
   const lowConfidence = draft.confidence > 0 && draft.confidence < 82;
   const routeRequired = draft.protocol !== "autorola";
-  const requiredMissing = !draft.jobRef || !draft.deliveryDate || !draft.collectionDate || (routeRequired && (!draft.pickupPostcode || !draft.deliveryPostcode));
+  const requiredMissing = !draft.jobRef || !draft.deliveryDate || !draft.collectionDate || !draft.vehicleType || (routeRequired && (!draft.pickupPostcode || !draft.deliveryPostcode));
 
   const addFiles = async (event: ChangeEvent<HTMLInputElement>) => {
     const selected = [...(event.target.files ?? [])].filter(file => !file.type || file.type.startsWith("image/") || /\.(?:png|jpe?g|webp|gif|bmp|heic|heif)$/i.test(file.name));
@@ -114,7 +114,8 @@ export function ScanJobPage() {
       collectionDate: draft.collectionDate, collectionTime: draft.collectionTime, deliveryDate: duplicate?.deliveryDate || "", deliveryTime: duplicate?.deliveryTime || "",
       makeModel: draft.makeModel || duplicate?.makeModel || "", carType: duplicate?.carType || "", registration: draft.registrations[0] || duplicate?.registration || "", registrations: draft.registrations.length ? draft.registrations : duplicate?.registrations, payslipRegistration: duplicate?.payslipRegistration || "",
       customerType: duplicate?.customerType || "", pickupTown: draft.pickupTown, pickupPostcode: draft.pickupPostcode.replace(/\s/g, "").toUpperCase(),
-      deliveryTown: draft.deliveryTown, deliveryPostcode: draft.deliveryPostcode.replace(/\s/g, "").toUpperCase(), odometerStart: duplicate?.odometerStart ?? null,
+      deliveryTown: draft.deliveryTown, deliveryPostcode: draft.deliveryPostcode.replace(/\s/g, "").toUpperCase(), vehicleType: draft.vehicleType as VehicleType, odometerStart: draft.odometerStart ? Number(draft.odometerStart) : duplicate?.odometerStart ?? null,
+      rangeStart: draft.rangeStart ? Number(draft.rangeStart) : duplicate?.rangeStart ?? null, rangeEnd: duplicate?.rangeEnd ?? null,
       odometerEnd: duplicate?.odometerEnd ?? null, estimatedMiles: duplicate?.estimatedMiles ?? null, actualMiles: duplicate?.actualMiles ?? null, payslipMiles: duplicate?.payslipMiles ?? null,
       waitingEstimated: duplicate?.waitingEstimated ?? null, waitingPaid: duplicate?.waitingPaid ?? null, tariffPaid: duplicate?.tariffPaid ?? null,
       firstDeliveryBefore9: duplicate?.firstDeliveryBefore9 ?? null, deliveryOrder: duplicate?.deliveryOrder ?? null, weekStart: mondayOf(draft.collectionDate),
@@ -146,7 +147,7 @@ export function ScanJobPage() {
         <button className="scan-command-button" type="button" disabled={!files.length || busy} onClick={() => void scan()}>{busy ? <LoaderCircle className="spin"/> : <ScanLine/>}{busy ? (language === "ro" ? "A.R.I.S. citește" : "A.R.I.S. is reading") : (language === "ro" ? "Citește toate imaginile" : "Read all images")}</button>
         {busy && <div className="scan-progress"><i><b style={{ width: `${Math.round(progress * 100)}%` }}/></i><span>{stage} · {Math.round(progress * 100)}%</span></div>}
       </article>
-      <article className="scan-security"><ShieldAlert/><div><strong>{language === "ro" ? "Controlul rămâne la tine, Domnule" : "You remain in control, Sir"}</strong><p>{language === "ro" ? "Data colectării nu se presupune. VIN-ul incomplet este marcat. Câmpurile nesigure blochează salvarea până le verifici." : "The collection date is never assumed. An incomplete VIN is marked. Uncertain fields block saving until you review them."}</p></div></article>
+      <article className="scan-security"><ShieldAlert/><div><strong>{language === "ro" ? `Controlul rămâne la tine, ${data.profile?.name}` : `You remain in control, ${data.profile?.name}`}</strong><p>{language === "ro" ? "Data colectării nu se presupune. VIN-ul incomplet este marcat. Câmpurile nesigure blochează salvarea până le verifici." : "The collection date is never assumed. An incomplete VIN is marked. Uncertain fields block saving until you review them."}</p></div></article>
     </section>
 
     {(draft.rawText || message) && <form className="form-card scan-review" onSubmit={save}>
@@ -160,6 +161,9 @@ export function ScanJobPage() {
         <Field label={language === "ro" ? "Înmatriculare sau înmatriculări" : "Registration or registrations"}><input value={draft.registrations.join(" / ")} onChange={event => update("registrations", parseRegistrationInput(event.target.value))} placeholder="X005WAT / KJ23LHE"/></Field>
         <Field label={language === "ro" ? "Marcă și model" : "Make and model"}><input value={draft.makeModel} onChange={event => update("makeModel", event.target.value)} placeholder="VAUXHALL VIVARO"/></Field>
         <Field label={language === "ro" ? "An, completat manual" : "Year, entered manually"}><input inputMode="numeric" value={draft.vehicleYear} onChange={event => update("vehicleYear", event.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="2027"/></Field>
+        <Field label={language === "ro" ? "Tip vehicul *" : "Vehicle type *"}><select className={!draft.vehicleType ? "field-invalid" : ""} value={draft.vehicleType} onChange={event => update("vehicleType", event.target.value as VehicleType)}><option value="">{language === "ro" ? "Alege" : "Choose"}</option><option value="electric">Electric</option><option value="petrol">Petrol</option><option value="diesel">Diesel</option><option value="hybrid">Hybrid</option></select></Field>
+        <Field label={language === "ro" ? "Kilometraj la colectare, mile, opțional" : "Collection odometer, miles, optional"}><input type="number" min="0" step="0.1" value={draft.odometerStart} onChange={event => update("odometerStart", event.target.value)}/></Field>
+        <Field label={language === "ro" ? "Range la colectare, mile, opțional" : "Collection range, miles, optional"}><input type="number" min="0" step="0.1" value={draft.rangeStart} onChange={event => update("rangeStart", event.target.value)}/></Field>
       </div>
       <section className="protocol-selector"><div><span className="eyebrow">A.R.I.S. PROTOCOL</span><h3>{language === "ro" ? "Platformă suplimentară" : "Additional platform"}</h3><p>{language === "ro" ? "Porecla este afișată mare, iar denumirea reală apare dedesubt." : "The codename appears large and the real name appears below."}</p></div><div className="protocol-options"><button type="button" className={!draft.protocol ? "active" : ""} onClick={() => update("protocol", undefined)}><strong>{language === "ro" ? "FĂRĂ PROTOCOL" : "NO PROTOCOL"}</strong><small>{language === "ro" ? "Job normal" : "Standard job"}</small></button>{(Object.keys(PROTOCOLS) as JobProtocol[]).map(protocol => <button type="button" key={protocol} className={draft.protocol === protocol ? "active" : ""} onClick={() => update("protocol", protocol)}><ProtocolBadge protocol={protocol} language={language} compact/></button>)}</div></section>
       <h3 className="form-section-title">{language === "ro" ? "Colectare" : "Pickup"}</h3>

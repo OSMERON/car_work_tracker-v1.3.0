@@ -1,6 +1,29 @@
 export type JobStatus = "collected" | "delivered" | "cancelled";
 export type Language = "ro" | "en";
 export type JobProtocol = "model" | "hilton" | "autorola" | "other";
+export type VehicleType = "electric" | "petrol" | "diesel" | "hybrid" | "unspecified";
+export type PaymentSource = "self" | "company";
+export type ThemeMode = "light" | "dark";
+
+export interface FuelEntry {
+  litres: number | null;
+  totalCost: number | null;
+  pricePerLitre: number | null;
+  payer: PaymentSource;
+}
+
+export interface ChargingEntry {
+  totalCost: number | null;
+  durationMinutes: number | null;
+  averageKw: number | null;
+  tariffPencePerKwh: number | null;
+  payer: PaymentSource;
+}
+
+export interface UserProfile {
+  name: string;
+  initialized: boolean;
+}
 
 export interface Job {
   id: string;
@@ -12,6 +35,7 @@ export interface Job {
   deliveryTime: string;
   makeModel: string;
   carType: string;
+  vehicleType?: VehicleType;
   registration: string;
   payslipRegistration: string;
   customerType: string;
@@ -21,6 +45,8 @@ export interface Job {
   deliveryPostcode: string;
   odometerStart: number | null;
   odometerEnd: number | null;
+  rangeStart?: number | null;
+  rangeEnd?: number | null;
   estimatedMiles: number | null;
   actualMiles: number | null;
   payslipMiles: number | null;
@@ -53,6 +79,8 @@ export interface Job {
   protocol?: JobProtocol;
   protocolExtraDetected?: number | null;
   protocolExtraPaid?: number | null;
+  fuelEntry?: FuelEntry;
+  chargingEntry?: ChargingEntry;
 }
 
 export interface Expense {
@@ -116,6 +144,8 @@ export interface PayslipExpense {
 export interface AppData {
   version: number;
   generatedAt: string;
+  profile?: UserProfile;
+  themeMode?: ThemeMode;
   jobs: Job[];
   expenses: Expense[];
   payslips: Payslip[];

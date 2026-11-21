@@ -1,17 +1,4 @@
-const DATABASE = "car-work-tracker-files";
-const VERSION = 2;
-const IMAGE_STORE = "job-source-images";
-const PDF_STORE = "payslip-pdfs";
-
-const openDatabase = () => new Promise<IDBDatabase>((resolve, reject) => {
-  const request = indexedDB.open(DATABASE, VERSION);
-  request.onupgradeneeded = () => {
-    if (!request.result.objectStoreNames.contains(PDF_STORE)) request.result.createObjectStore(PDF_STORE);
-    if (!request.result.objectStoreNames.contains(IMAGE_STORE)) request.result.createObjectStore(IMAGE_STORE);
-  };
-  request.onsuccess = () => resolve(request.result);
-  request.onerror = () => reject(request.error);
-});
+import { clearAllFileStores, IMAGE_STORE, openFileDatabase } from "./fileDatabase";
 
 const browserImage = (file: File) => new Promise<HTMLImageElement>((resolve, reject) => {
   const url = URL.createObjectURL(file);
@@ -44,7 +31,7 @@ export const compressJobImage = async (file: File) => {
 };
 
 export const saveJobImages = async (jobId: string, images: Blob[]) => {
-  const database = await openDatabase();
+  const database = await openFileDatabase();
   await new Promise<void>((resolve, reject) => {
     const transaction = database.transaction(IMAGE_STORE, "readwrite");
     transaction.objectStore(IMAGE_STORE).put(images, jobId);
@@ -55,7 +42,7 @@ export const saveJobImages = async (jobId: string, images: Blob[]) => {
 };
 
 export const getJobImages = async (jobId: string) => {
-  const database = await openDatabase();
+  const database = await openFileDatabase();
   const images = await new Promise<Blob[]>((resolve, reject) => {
     const request = database.transaction(IMAGE_STORE, "readonly").objectStore(IMAGE_STORE).get(jobId);
     request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result.filter(item => item instanceof Blob) : []);
@@ -66,7 +53,7 @@ export const getJobImages = async (jobId: string) => {
 };
 
 export const deleteJobImages = async (jobId: string) => {
-  const database = await openDatabase();
+  const database = await openFileDatabase();
   await new Promise<void>((resolve, reject) => {
     const transaction = database.transaction(IMAGE_STORE, "readwrite");
     transaction.objectStore(IMAGE_STORE).delete(jobId);
@@ -76,9 +63,4 @@ export const deleteJobImages = async (jobId: string) => {
   database.close();
 };
 
-export const clearLocalFiles = () => new Promise<void>((resolve, reject) => {
-  const request = indexedDB.deleteDatabase(DATABASE);
-  request.onsuccess = () => resolve();
-  request.onerror = () => reject(request.error);
-  request.onblocked = () => reject(new Error("Database is open"));
-});
+export const clearLocalFiles = clearAllFileStores;

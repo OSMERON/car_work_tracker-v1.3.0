@@ -10,8 +10,9 @@ import { jobMiles } from "../lib/analytics";
 import { tariffForMiles } from "../lib/rates";
 import { routePerformance } from "../lib/performance";
 import type { DailyLog, Job, Language, PayslipJob } from "../types";
+import { calculateConsumption } from "../lib/consumption";
 
-type Scope = "week" | "month" | "all";
+type Scope = "week" | "month" | "custom";
 type SourceChoice = keyof SourceTotals;
 type DailyRow = { date: string; label: string; jobs: number; miles: number; jobIncome: number; waitingIncome: number; totalIncome: number; workHours: number; hourly: number; startHour: number | null };
 
@@ -45,13 +46,16 @@ export function InsightsPage() {
   }, [data]);
   const [scope, setScope] = useState<Scope>("week");
   const [anchor, setAnchor] = useState(todayIso());
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
   const [source, setSource] = useState<SourceChoice>("combined");
+  const [consumptionMetric, setConsumptionMetric] = useState<"rangeUsed" | "difference" | "efficiency">("rangeUsed");
   const [workDate, setWorkDate] = useState(todayIso());
   const initialLog = (data.dailyLogs ?? []).find(log => log.date === todayIso());
   const [startTime, setStartTime] = useState(initialLog?.leftHomeTime ?? "");
   const [endTime, setEndTime] = useState(initialLog?.returnedHomeTime ?? "");
   const [saved, setSaved] = useState(false);
-  const range = useMemo(() => periodRange(scope, anchor, allDates.earliest, allDates.latest), [scope, anchor, allDates]);
+  const range = useMemo(() => scope === "custom" ? { start: customStart || allDates.earliest, end: customEnd || allDates.latest } : periodRange(scope, anchor, allDates.earliest, allDates.latest), [scope, anchor, allDates, customStart, customEnd]);
   const totals = useMemo(() => calculateSourceTotals(data, range.start, range.end), [data, range]);
   const selected = totals[source];
 
@@ -95,9 +99,11 @@ export function InsightsPage() {
   ];
   const routes = useMemo(() => routePerformance(data, range.start, range.end).slice(0, 8), [data, range]);
   const fuelTotal = fuelData.reduce((sum, row) => sum + row.fuel, 0);
+  const consumptionData = useMemo(() => manualJobs.map(job => ({ job, result: calculateConsumption(job) })).filter(item => item.result && !item.result.rangeIncreased).map(item => ({ ...item, label: item.job.registration || item.job.jobRef, rangeUsed: item.result!.rangeUsed, difference: item.result!.difference, efficiency: item.result!.efficiency })).sort((a, b) => (b.job.deliveryDate || b.job.collectionDate).localeCompare(a.job.deliveryDate || a.job.collectionDate)), [manualJobs]);
+  const insufficientConsumption = manualJobs.length - consumptionData.length;
 
   return <div className="intel-only-page">
-    <header className="intel-titlebar"><div><span><BrainCircuit/> A.R.I.S. ANALYSIS ONLY · v1.5.5</span><h1>{language === "ro" ? "Panou de analiză" : "Analysis dashboard"}</h1><p>{language === "ro" ? "Numai grafice, calcule și date. Aceasta nu este pagina Acasă." : "Charts, calculations and data only. This is not the Home page."}</p></div><BarChart3/></header>
+    <header className="intel-titlebar"><div><span><BrainCircuit/> A.R.I.S. ANALYSIS ONLY · v1.5.6</span><h1>{language === "ro" ? "Panou de analiză" : "Analysis dashboard"}</h1><p>{language === "ro" ? "Numai grafice, calcule și date. Aceasta nu este pagina Acasă." : "Charts, calculations and data only. This is not the Home page."}</p></div><BarChart3/></header>
 
     <form className="intel-start-question" onSubmit={saveWorkTime}>
       <div><Clock3/><span><small>{language === "ro" ? "ÎNREGISTRARE ZILNICĂ" : "DAILY RECORD"}</small><strong>{language === "ro" ? "La ce oră ai început munca?" : "What time did you start work?"}</strong></span></div>
@@ -108,8 +114,9 @@ export function InsightsPage() {
     </form>
 
     <section className="intel-controls">
-      <label><CalendarDays/><span>{language === "ro" ? "Perioada" : "Period"}</span><div>{(["week", "month", "all"] as Scope[]).map(value => <button type="button" key={value} className={scope === value ? "active" : ""} onClick={() => setScope(value)}>{value === "week" ? (language === "ro" ? "Săptămână" : "Week") : value === "month" ? (language === "ro" ? "Lună" : "Month") : (language === "ro" ? "Tot" : "All")}</button>)}</div></label>
+      <label><CalendarDays/><span>{language === "ro" ? "Perioada" : "Period"}</span><div>{(["week", "month", "custom"] as Scope[]).map(value => <button type="button" key={value} className={scope === value ? "active" : ""} onClick={() => setScope(value)}>{value === "week" ? (language === "ro" ? "Săptămână" : "Week") : value === "month" ? (language === "ro" ? "Lună" : "Month") : (language === "ro" ? "Perioadă" : "Custom")}</button>)}</div></label>
       <label><span>{language === "ro" ? "Data analizei" : "Analysis date"}</span><input type="date" value={anchor} onChange={event => setAnchor(event.target.value)}/></label>
+      {scope === "custom" && <><label><span>{language === "ro" ? "De la" : "From"}</span><input type="date" value={customStart} onChange={event => setCustomStart(event.target.value)}/></label><label><span>{language === "ro" ? "Până la" : "To"}</span><input type="date" value={customEnd} onChange={event => setCustomEnd(event.target.value)}/></label></>}
       <label><span>{language === "ro" ? "Sursa" : "Source"}</span><select value={source} onChange={event => setSource(event.target.value as SourceChoice)}><option value="combined">{sourceLabel("combined", language)}</option><option value="manual">{sourceLabel("manual", language)}</option><option value="pdf">PDF</option></select></label>
     </section>
 
@@ -123,6 +130,7 @@ export function InsightsPage() {
     </section>
 
     <section className="intel-chart-grid">
+      <ChartPanel wide title={language === "ro" ? "Consumul fiecărei mașini" : "Consumption by car"} text={language === "ro" ? "Alege indicatorul. Apasă o mașină pentru toate detaliile." : "Choose a metric. Tap a car for all details."}><div className="scope-tabs"><button type="button" className={consumptionMetric === "rangeUsed" ? "active" : ""} onClick={() => setConsumptionMetric("rangeUsed")}>{language === "ro" ? "Range consumat" : "Range used"}</button><button type="button" className={consumptionMetric === "difference" ? "active" : ""} onClick={() => setConsumptionMetric("difference")}>{language === "ro" ? "Diferență" : "Difference"}</button><button type="button" className={consumptionMetric === "efficiency" ? "active" : ""} onClick={() => setConsumptionMetric("efficiency")}>{language === "ro" ? "Eficiență" : "Efficiency"}</button></div>{consumptionData.length ? <><div className="consumption-chart-scroll"><ResponsiveContainer width={Math.max(700, consumptionData.length * 95)} height={300}><BarChart data={consumptionData}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="label"/><YAxis/><Tooltip/><Bar dataKey={consumptionMetric} fill="#43d7ff" radius={[6,6,0,0]}/></BarChart></ResponsiveContainer></div><div className="consumption-cards">{consumptionData.map(({ job, result }) => <details key={job.id}><summary><CarFront/>{job.registration || job.jobRef} · {job.makeModel || (language === "ro" ? "Mașină" : "Car")}</summary><p>{job.deliveryDate || job.collectionDate} · Job {job.jobRef}</p><p>{job.pickupTown || "?"} → {job.deliveryTown || "?"}</p><p>{language === "ro" ? "Distanță reală" : "Actual distance"}: {result!.distance.toFixed(1)} mi</p><p>{language === "ro" ? "Range consumat" : "Range used"}: {result!.rangeUsed.toFixed(1)} mi</p><p>{language === "ro" ? "Diferență" : "Difference"}: {result!.difference.toFixed(1)} mi</p><p>{language === "ro" ? "Eficiență" : "Efficiency"}: {result!.efficiency.toFixed(1)}%</p></details>)}</div></> : <Empty language={language}/>} {!!insufficientConsumption && <p className="calculation-note">{insufficientConsumption} {language === "ro" ? "mașini cu date insuficiente, excluse din grafic" : "cars with insufficient data, excluded from chart"}</p>}</ChartPanel>
       <ChartPanel title={language === "ro" ? "Venit zilnic" : "Daily income"} text={language === "ro" ? "Plata joburilor plus waiting plătit către tine." : "Job payments plus waiting paid to you."}><ResponsiveContainer width="100%" height={270}><BarChart data={dailyData}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="label"/><YAxis/><Tooltip formatter={(value: number) => money(value)}/><Legend/><Bar stackId="income" dataKey="jobIncome" name={language === "ro" ? "Plată joburi" : "Job pay"} fill="#43d7ff"/><Bar stackId="income" dataKey="waitingIncome" name={language === "ro" ? "Waiting plătit" : "Paid waiting"} fill="#ffb84d" radius={[5,5,0,0]}/></BarChart></ResponsiveContainer></ChartPanel>
       <ChartPanel title={language === "ro" ? "Câștig pe oră" : "Earnings per hour"} text={language === "ro" ? "Folosește ora de început și ora de sfârșit. Pentru ziua curentă calculează până acum." : "Uses start and finish time. For today it calculates up to now."}><ResponsiveContainer width="100%" height={270}><AreaChart data={dailyData}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="label"/><YAxis/><Tooltip formatter={(value: number) => `${money(value)}/h`}/><Area type="monotone" dataKey="hourly" name={language === "ro" ? "£ pe oră" : "£ per hour"} stroke="#23e6a8" fill="#23e6a833" strokeWidth={3}/></AreaChart></ResponsiveContainer></ChartPanel>
       <ChartPanel title={language === "ro" ? "Ora începerii" : "Work start time"} text={language === "ro" ? "Arată ora salvată pentru fiecare zi lucrată." : "Shows the saved start time for every worked day."}><ResponsiveContainer width="100%" height={270}><LineChart data={dailyData}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="label"/><YAxis domain={[0,24]} tickFormatter={value => timeLabel(Number(value))}/><Tooltip formatter={(value: number) => timeLabel(value)}/><Line connectNulls type="monotone" dataKey="startHour" name={language === "ro" ? "Ora începutului" : "Start time"} stroke="#8c7cff" strokeWidth={3}/></LineChart></ResponsiveContainer></ChartPanel>

@@ -1,13 +1,22 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import seed from "../data/seed-data.json";
-import type { AppData, DailyLog, Expense, Job, Language, Payslip, PerformanceSettings, TaxAdjustment, TaxSettings } from "../types";
+import type { AppData, DailyLog, Expense, Job, Language, Payslip, PerformanceSettings, TaxAdjustment, TaxSettings, ThemeMode, UserProfile } from "../types";
 import { clearLocalFiles, deleteJobImages } from "../lib/jobImageStore";
+import { clearFileStore, IMAGE_STORE, PDF_STORE } from "../lib/fileDatabase";
 import { jobRegistrations, normalizeRegistration } from "../lib/jobProtocols";
 import { tariffForMiles } from "../lib/rates";
 import { isCompanyFuelExpense, isCompanyFuelPdfRow } from "../lib/expenseRules";
 
 const DATA_KEY = "car-work-tracker-data-v1";
 const LANGUAGE_KEY = "car-work-tracker-language";
+export type DataCategory = "jobs" | "expenses" | "payslips" | "energy" | "settings";
+
+const emptyData = (): AppData => ({
+  version: 3,
+  generatedAt: new Date().toISOString(),
+  profile: { name: "", initialized: false },
+  themeMode: "dark",
+  jobs: [], expenses: [], payslips: [], completedWeeks: [], confirmedTaxPeriods: [], taxAdjustments: [], dailyLogs: []
+});
 
 const normalizeTaxSettings = (settings?: TaxSettings): TaxSettings => {
   const legacyScheme = (settings as unknown as { scheme?: string } | undefined)?.scheme;
@@ -35,14 +44,18 @@ const normalizeJobs = (jobs: Job[]) => {
     if (seen.has(id)) id = `${id}-${job.jobRef || index}`;
     seen.add(id);
     const registrations = jobRegistrations(job);
-    if (job.pickupTown || job.deliveryTown || !job.makeModel.includes("/")) return { ...job, id, registrations };
+    const base = { ...job, id, registrations, vehicleType: job.vehicleType ?? "unspecified" as const, rangeStart: job.rangeStart ?? null, rangeEnd: job.rangeEnd ?? null };
+    if (job.pickupTown || job.deliveryTown || !job.makeModel.includes("/")) return base;
     const parts = job.makeModel.split("/").map(value => value.replace(/\([^)]*\)/g, "").trim()).filter(Boolean);
-    return { ...job, id, registrations, pickupTown: parts[0] ?? "", deliveryTown: parts[1] ?? "" };
+    return { ...base, pickupTown: parts[0] ?? "", deliveryTown: parts[1] ?? "" };
   });
 };
 
 const normalizeData = (input: AppData): AppData => ({
   ...input,
+  version: 3,
+  profile: input.profile ?? { name: "Bogdan", initialized: true },
+  themeMode: input.themeMode === "light" ? "light" : "dark",
   completedWeeks: input.completedWeeks ?? input.payslips.map(p => p.weekStart),
   confirmedTaxPeriods: input.confirmedTaxPeriods ?? [],
   taxAdjustments: input.taxAdjustments ?? [],
@@ -74,8 +87,10 @@ const normalizeData = (input: AppData): AppData => ({
 });
 
 const loadData = (): AppData => {
-  try { return normalizeData(JSON.parse(localStorage.getItem(DATA_KEY) || "null") || seed as AppData); }
-  catch { return normalizeData(seed as AppData); }
+  const stored = localStorage.getItem(DATA_KEY);
+  if (!stored) return normalizeData(emptyData());
+  try { return normalizeData(JSON.parse(stored) as AppData); }
+  catch { return normalizeData(emptyData()); }
 };
 
 type DataApi = {
@@ -90,6 +105,8 @@ type DataApi = {
   saveTaxAdjustment: (item: TaxAdjustment) => void;
   removeTaxAdjustment: (id: string) => void;
   setTaxPeriodConfirmed: (periodKey: string, confirmed: boolean) => void;
+  saveProfile: (profile: UserProfile) => void; setThemeMode: (mode: ThemeMode) => void;
+  clearCategories: (categories: DataCategory[]) => Promise<void>;
   replaceData: (next: AppData) => void; restoreSeed: () => void; clearAllData: () => Promise<void>;
 };
 
@@ -220,12 +237,32 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const saveTaxAdjustment = (item: TaxAdjustment) => setData(prev => ({ ...prev, taxAdjustments: [...(prev.taxAdjustments ?? []).filter(entry => entry.id !== item.id), item] }));
   const removeTaxAdjustment = (id: string) => setData(prev => ({ ...prev, taxAdjustments: (prev.taxAdjustments ?? []).filter(item => item.id !== id) }));
   const setTaxPeriodConfirmed = (periodKey: string, confirmed: boolean) => setData(prev => ({ ...prev, confirmedTaxPeriods: confirmed ? [...new Set([...(prev.confirmedTaxPeriods ?? []), periodKey])] : (prev.confirmedTaxPeriods ?? []).filter(key => key !== periodKey) }));
-  const restoreSeed = () => setData(normalizeData(seed as AppData));
+  const saveProfile = (profile: UserProfile) => setData(prev => ({ ...prev, profile }));
+  const setThemeMode = (themeMode: ThemeMode) => {
+    document.documentElement.dataset.themeMode = themeMode;
+    document.documentElement.dataset.theme = themeMode;
+    localStorage.setItem("aris-theme-mode", themeMode);
+    setData(prev => ({ ...prev, themeMode }));
+  };
+  const clearCategories = async (categories: DataCategory[]) => {
+    if (categories.includes("payslips")) await clearFileStore(PDF_STORE).catch(() => undefined);
+    if (categories.includes("jobs")) await clearFileStore(IMAGE_STORE).catch(() => undefined);
+    setData(prev => {
+      const next: AppData = { ...prev };
+      if (categories.includes("jobs")) { next.jobs = []; next.completedWeeks = []; }
+      if (categories.includes("expenses")) next.expenses = [];
+      if (categories.includes("payslips")) next.payslips = [];
+      if (categories.includes("energy")) next.jobs = next.jobs.map(job => ({ ...job, fuelEntry: undefined, chargingEntry: undefined }));
+      if (categories.includes("settings")) { next.profile = { name: "", initialized: false }; next.themeMode = "dark"; }
+      return normalizeData({ ...next, generatedAt: new Date().toISOString() });
+    });
+  };
+  const restoreSeed = () => setData(normalizeData(emptyData()));
   const clearAllData = async () => {
     await clearLocalFiles().catch(() => undefined);
-    setData(normalizeData({ version: 2, generatedAt: new Date().toISOString(), jobs: [], expenses: [], payslips: [], completedWeeks: [], confirmedTaxPeriods: [], taxAdjustments: [], dailyLogs: [] }));
+    setData(normalizeData(emptyData()));
   };
-  const value = useMemo(() => ({ data, language, setLanguage, saveJob, removeJob, saveExpenses, removeExpense, savePayslip, removePayslip, setWeekComplete, saveTaxSettings, saveDailyLog, savePerformanceSettings, saveTaxAdjustment, removeTaxAdjustment, setTaxPeriodConfirmed, replaceData, restoreSeed, clearAllData }), [data, language]);
+  const value = useMemo(() => ({ data, language, setLanguage, saveJob, removeJob, saveExpenses, removeExpense, savePayslip, removePayslip, setWeekComplete, saveTaxSettings, saveDailyLog, savePerformanceSettings, saveTaxAdjustment, removeTaxAdjustment, setTaxPeriodConfirmed, saveProfile, setThemeMode, clearCategories, replaceData, restoreSeed, clearAllData }), [data, language]);
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }
 

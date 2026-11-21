@@ -5,7 +5,7 @@ import { Field, PageHeader } from "../components/Ui";
 import { useData } from "../store/DataContext";
 import { tFor } from "../i18n";
 import { mondayOf, todayIso } from "../lib/date";
-import type { Job } from "../types";
+import type { Job, VehicleType } from "../types";
 
 export function Collect() {
   const { saveJob, language } = useData();
@@ -15,24 +15,26 @@ export function Collect() {
   const [form, setForm] = useState({
     date: todayIso(), time: "", jobRef: "", registration: "", makeModel: "", carType: "",
     customerType: "", pickupTown: "", pickupPostcode: "", deliveryTown: "",
-    deliveryPostcode: "", odometerStart: "", estimatedMiles: "", notes: ""
+    deliveryPostcode: "", odometerStart: "", rangeStart: "", estimatedMiles: "", notes: "", vehicleType: "" as VehicleType | ""
   });
   const set = (key: string, value: string) => setForm(previous => ({ ...previous, [key]: value }));
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (!form.date || !form.jobRef || !form.pickupTown) { setMessage(t("required")); return; }
+    if (!form.date || !form.jobRef || !form.pickupTown || !form.vehicleType) { setMessage(language === "ro" ? "Completează câmpurile obligatorii, inclusiv tipul vehiculului." : "Complete the required fields, including vehicle type."); return; }
     const now = new Date().toISOString();
     const job: Job = {
       id: crypto.randomUUID(), jobRef: form.jobRef.trim(), status: "collected",
       collectionDate: form.date, collectionTime: form.time, deliveryDate: "", deliveryTime: "",
       makeModel: form.makeModel, carType: form.carType,
+      vehicleType: form.vehicleType,
       registration: form.registration.toUpperCase().replace(/\s/g, ""), registrations: form.registration ? [form.registration.toUpperCase().replace(/\s/g, "")] : [], payslipRegistration: "",
       customerType: form.customerType, pickupTown: form.pickupTown,
       pickupPostcode: form.pickupPostcode.toUpperCase().replace(/\s/g, ""),
       deliveryTown: form.deliveryTown,
       deliveryPostcode: form.deliveryPostcode.toUpperCase().replace(/\s/g, ""),
       odometerStart: form.odometerStart ? Number(form.odometerStart) : null, odometerEnd: null,
+      rangeStart: form.rangeStart ? Number(form.rangeStart) : null, rangeEnd: null,
       estimatedMiles: form.estimatedMiles ? Number(form.estimatedMiles) : null,
       actualMiles: null, payslipMiles: null, waitingEstimated: null, waitingPaid: null,
       tariffPaid: null, firstDeliveryBefore9: null, deliveryOrder: null,
@@ -53,8 +55,10 @@ export function Collect() {
         <Field label={`${t("registration")} (${language === "ro" ? "opțional" : "optional"})`}><input value={form.registration} onChange={event => set("registration", event.target.value)} placeholder="AB12CDE"/></Field>
         <Field label={t("makeModel")}><input value={form.makeModel} onChange={event => set("makeModel", event.target.value)} placeholder="BMW X3"/></Field>
         <Field label={t("carType")}><input value={form.carType} onChange={event => set("carType", event.target.value)} placeholder="SUV / EV / Van"/></Field>
+        <Field label={language === "ro" ? "Tip vehicul *" : "Vehicle type *"}><select value={form.vehicleType} onChange={event => set("vehicleType", event.target.value)} required><option value="">{language === "ro" ? "Alege" : "Choose"}</option><option value="electric">Electric</option><option value="petrol">Petrol</option><option value="diesel">Diesel</option><option value="hybrid">Hybrid</option></select></Field>
         <Field label={t("customerType")}><select value={form.customerType} onChange={event => set("customerType", event.target.value)}><option value="">—</option><option>DEALER</option><option>CLIENT</option><option>BUYER</option><option>AUCTION</option></select></Field>
-        <Field label={t("odometerStart")}><input type="number" step="0.1" value={form.odometerStart} onChange={event => set("odometerStart", event.target.value)}/></Field>
+        <Field label={`${t("odometerStart")} (${language === "ro" ? "mile, opțional" : "miles, optional"})`}><input type="number" step="0.1" value={form.odometerStart} onChange={event => set("odometerStart", event.target.value)}/></Field>
+        <Field label={language === "ro" ? "Range la colectare (mile, opțional)" : "Collection range (miles, optional)"}><input type="number" min="0" step="0.1" value={form.rangeStart} onChange={event => set("rangeStart", event.target.value)}/></Field>
       </div>
       <h2 className="form-section-title">{t("pickup")}</h2>
       <div className="form-grid">

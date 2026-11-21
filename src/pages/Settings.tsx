@@ -8,13 +8,14 @@ import { downloadAll, getCloudConfig, getSupabase, saveCloudConfig, uploadAll } 
 const download=(name:string,content:string,type:string)=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([content],{type}));a.download=name;a.click();URL.revokeObjectURL(a.href)};
 const csv=(rows:Record<string,unknown>[])=>{if(!rows.length)return"";const keys=Object.keys(rows[0]);const esc=(v:unknown)=>`"${String(v??"").replace(/"/g,'""')}"`;return[keys.map(esc).join(","),...rows.map(r=>keys.map(k=>esc(r[k])).join(","))].join("\n")};
 export function SettingsPage() {
-  const { data, language, setLanguage, replaceData, restoreSeed } = useData();
+  const { data, language, setLanguage, replaceData, saveProfile } = useData();
   const t = tFor(language);
   const [config, setConfig] = useState(getCloudConfig());
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [user, setUser] = useState("");
   const [message, setMessage] = useState("");
+  const [driverName, setDriverName] = useState(data.profile?.name ?? "");
 
   useEffect(() => { getSupabase()?.auth.getUser().then(({ data }) => setUser(data.user?.email || "")); }, []);
   const auth = async (mode: "in" | "up") => {
@@ -34,6 +35,7 @@ export function SettingsPage() {
 
   return <>
     <PageHeader title={t("settings")}/>
+    <section className="settings-card"><h2>{language === "ro" ? "Profil șofer" : "Driver profile"}</h2><p>{language === "ro" ? "Schimbarea numelui actualizează numai numele afișat în aplicație." : "Changing the name only updates the name displayed in the app."}</p><div className="form-grid"><Field label={language === "ro" ? "Nume" : "Name"}><input value={driverName} onChange={event => setDriverName(event.target.value)}/></Field></div><button className="primary-button" onClick={() => { if (driverName.trim()) { saveProfile({ name: driverName.trim(), initialized: true }); setMessage(t("saved")); } }}>{t("save")}</button></section>
     <section className="settings-card"><h2>{t("language")}</h2><div className="segmented"><button className={language === "ro" ? "active" : ""} onClick={() => setLanguage("ro")}>Română</button><button className={language === "en" ? "active" : ""} onClick={() => setLanguage("en")}>English</button></div></section>
     <section className="settings-card">
       <div className="settings-title"><Cloud/><div><h2>{t("cloudSync")}</h2><p>{config.url && config.anonKey ? t("onlineReady") : t("onlineMissing")}</p></div></div>
@@ -42,7 +44,7 @@ export function SettingsPage() {
       <div className="form-grid auth-grid"><Field label={t("email")}><input type="email" value={email} onChange={e=>setEmail(e.target.value)}/></Field><Field label={t("password")}><input type="password" value={password} onChange={e=>setPassword(e.target.value)}/></Field></div>
       {user ? <div className="sync-actions"><span>{user}</span><button onClick={signOut}>{t("signOut")}</button><button className="primary-button" onClick={syncUp}><Upload size={17}/>{t("syncUp")}</button><button className="secondary-button" onClick={syncDown}><Download size={17}/>{t("syncDown")}</button></div> : <div className="sync-actions"><button className="primary-button" onClick={()=>auth("in")}>{t("signIn")}</button><button className="secondary-button" onClick={()=>auth("up")}>{t("signUp")}</button></div>}
     </section>
-    <section className="settings-card"><h2>{t("backup")}</h2><div className="sync-actions"><button className="secondary-button" onClick={()=>download(`car-work-backup-${new Date().toISOString().slice(0,10)}.json`,JSON.stringify(data,null,2),"application/json")}>{t("exportJson")}</button><button className="secondary-button" onClick={()=>download("car-work-jobs.csv",csv(data.jobs as unknown as Record<string,unknown>[]),"text/csv")}>{t("exportCsv")}</button><label className="secondary-button upload-button">{t("importJson")}<input type="file" accept="application/json" onChange={e=>importFile(e.target.files?.[0])}/></label><button className="danger-button" onClick={()=>{if(confirm(language==="ro"?"Restaurezi datele inițiale?":"Restore initial data?"))restoreSeed();}}>{t("restoreSeed")}</button></div></section>
+    <section className="settings-card"><h2>{t("backup")}</h2><p>{language === "ro" ? "Pentru Excel, backup ZIP și import folosește pagina Export și import din Meniu." : "For Excel, ZIP backup and import use Export and import from Menu."}</p><div className="sync-actions"><button className="secondary-button" onClick={()=>download(`car-work-backup-${new Date().toISOString().slice(0,10)}.json`,JSON.stringify(data,null,2),"application/json")}>{t("exportJson")}</button><button className="secondary-button" onClick={()=>download("car-work-jobs.csv",csv(data.jobs as unknown as Record<string,unknown>[]),"text/csv")}>{t("exportCsv")}</button><label className="secondary-button upload-button">{t("importJson")}<input type="file" accept="application/json" onChange={e=>importFile(e.target.files?.[0])}/></label></div></section>
     {message && <div className="toast-message">{message}</div>}<p className="settings-note">{t("installHint")}<br/>{t("userDataNotice")}</p>
   </>;
 }

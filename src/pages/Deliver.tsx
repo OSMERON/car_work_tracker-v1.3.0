@@ -5,11 +5,14 @@ import { Field, PageHeader, number } from "../components/Ui";
 import { useData } from "../store/DataContext";
 import { tFor } from "../i18n";
 import { mondayOf, todayIso } from "../lib/date";
-import type { Expense } from "../types";
+import type { Expense, Job } from "../types";
 import { tariffForMiles } from "../lib/rates";
 import { odometerMiles } from "../lib/analytics";
 import { calculateDirectRouteMiles } from "../lib/routeMiles";
 import { jobRegistrations } from "../lib/jobProtocols";
+import { ChargingCalculator, FuelCalculator } from "../components/EnergyCalculators";
+import type { ChargingEntry, FuelEntry } from "../types";
+import { calculateConsumption } from "../lib/consumption";
 
 type Row = { category: string; amount: string; claimed: string; receipt: boolean; notes: string };
 const blank = (): Row => ({ category: "Train", amount: "", claimed: "", receipt: false, notes: "" });
@@ -25,7 +28,9 @@ export function Deliver() {
   const [routeBusy, setRouteBusy] = useState(false);
   const [routeError, setRouteError] = useState("");
   const [routeInfo, setRouteInfo] = useState("");
-  const [form, setForm] = useState({ date: todayIso(), time: "", deliveryTown: "", deliveryPostcode: "", odometerEnd: "", routeMiles: "", actualDrivenMiles: "", waiting: "", before9: false, notes: "" });
+  const [form, setForm] = useState({ date: todayIso(), time: "", deliveryTown: "", deliveryPostcode: "", odometerEnd: "", rangeEnd: "", routeMiles: "", actualDrivenMiles: "", waiting: "", before9: false, notes: "" });
+  const [chargingEntry, setChargingEntry] = useState<ChargingEntry | undefined>();
+  const [fuelEntry, setFuelEntry] = useState<FuelEntry | undefined>();
 
   const deliveryPostcode = form.deliveryPostcode || job?.deliveryPostcode || "";
   const odometerCalculation = useMemo(() => odometerMiles(job?.odometerStart, form.odometerEnd ? Number(form.odometerEnd) : null), [form.odometerEnd, job?.odometerStart]);
@@ -53,7 +58,7 @@ export function Deliver() {
     event.preventDefault();
     if (!job) return;
     const now = new Date().toISOString();
-    saveJob({
+    const savedJob: Job = {
       ...job,
       status: "delivered",
       deliveryDate: form.date,
@@ -61,6 +66,7 @@ export function Deliver() {
       deliveryTown: form.deliveryTown || job.deliveryTown,
       deliveryPostcode: deliveryPostcode.toUpperCase().replace(/\s/g, ""),
       odometerEnd: form.odometerEnd ? Number(form.odometerEnd) : null,
+      rangeEnd: form.rangeEnd ? Number(form.rangeEnd) : null,
       actualMiles: actualDrivenMiles,
       estimatedMiles: form.routeMiles ? Number(form.routeMiles) : job.estimatedMiles,
       waitingEstimated: form.waiting ? Number(form.waiting) : 0,
@@ -68,8 +74,11 @@ export function Deliver() {
       firstDeliveryBefore9: form.before9,
       weekStart: mondayOf(form.date),
       notes: [job.notes, form.notes].filter(Boolean).join(" | "),
+      chargingEntry,
+      fuelEntry,
       updatedAt: now
-    });
+    };
+    saveJob(savedJob);
     const expenses: Expense[] = rows.filter(row => row.amount || row.claimed).map(row => ({
       id: crypto.randomUUID(),
       jobRef: job.jobRef,
@@ -84,6 +93,8 @@ export function Deliver() {
       notes: row.notes,
       source: "manual"
     }));
+    if (chargingEntry?.payer === "self" && chargingEntry.totalCost) expenses.push({ id: crypto.randomUUID(), jobRef: job.jobRef, date: form.date, weekStart: mondayOf(form.date), category: "Electric charging", description: "Electric charging", actualCost: chargingEntry.totalCost, claimed: 0, approved: 0, receipt: false, notes: "Created automatically by A.R.I.S.", source: "manual" });
+    if (fuelEntry?.payer === "self" && fuelEntry.totalCost) expenses.push({ id: crypto.randomUUID(), jobRef: job.jobRef, date: form.date, weekStart: mondayOf(form.date), category: "Fuel", description: "Fuel", actualCost: fuelEntry.totalCost, claimed: 0, approved: 0, receipt: false, notes: "Created automatically by A.R.I.S.", source: "manual" });
     if (expenses.length) saveExpenses(expenses);
     navigate("/");
   };
@@ -107,7 +118,11 @@ export function Deliver() {
         <div className="calculation-note">{language === "ro" ? "Tarif estimat pentru ruta directă" : "Estimated tariff for direct route"}: <strong>£{tariffForMiles(payableMiles).toFixed(2)}</strong> · {payableMiles.toFixed(1)} mi</div>
       </section>
 
-      <section className="personal-mileage delivery-personal-mileage"><div><span className="eyebrow">{language === "ro" ? "DISTANȚĂ REALĂ, OPȚIONAL" : "ACTUAL DISTANCE, OPTIONAL"}</span><p>{language === "ro" ? "Pentru costurile tale. Nu schimbă tariful jobului." : "For your own costs. It does not change the job tariff."}</p></div><div className="form-grid"><Field label={t("odometerEnd")}><input type="number" step="0.1" value={form.odometerEnd} onChange={event => set("odometerEnd", event.target.value)}/></Field><Field label={language === "ro" ? "Mile reale conduse" : "Actual driven miles"}><input type="number" min="0" step="0.1" value={form.actualDrivenMiles} placeholder={odometerCalculation === null ? "" : String(odometerCalculation)} onChange={event => set("actualDrivenMiles", event.target.value)}/></Field></div></section>
+      <section className="personal-mileage delivery-personal-mileage"><div><span className="eyebrow">{language === "ro" ? "DISTANȚĂ REALĂ, OPȚIONAL" : "ACTUAL DISTANCE, OPTIONAL"}</span><p>{language === "ro" ? "Pentru costurile tale. Nu schimbă tariful jobului." : "For your own costs. It does not change the job tariff."}</p></div><div className="form-grid"><Field label={`${t("odometerEnd")} (${language === "ro" ? "mile" : "miles"})`}><input type="number" step="0.1" value={form.odometerEnd} onChange={event => set("odometerEnd", event.target.value)}/></Field><Field label={language === "ro" ? "Mile reale conduse" : "Actual driven miles"}><input type="number" min="0" step="0.1" value={form.actualDrivenMiles} placeholder={odometerCalculation === null ? "" : String(odometerCalculation)} onChange={event => set("actualDrivenMiles", event.target.value)}/></Field><Field label={language === "ro" ? "Range la livrare (mile)" : "Delivery range (miles)"}><input type="number" min="0" step="0.1" value={form.rangeEnd} onChange={event => set("rangeEnd", event.target.value)}/></Field></div>
+      {job && (() => { const preview = calculateConsumption({ ...job, odometerEnd: form.odometerEnd ? Number(form.odometerEnd) : null, actualMiles: actualDrivenMiles, rangeEnd: form.rangeEnd ? Number(form.rangeEnd) : null }); return preview ? <p className="calculation-note">{preview.rangeIncreased ? (language === "ro" ? "Range crescut" : "Range increased") : `${language === "ro" ? "Consum range" : "Range used"}: ${preview.rangeUsed.toFixed(1)} mi · ${language === "ro" ? "Eficiență" : "Efficiency"}: ${preview.efficiency.toFixed(1)}%`}</p> : <p className="calculation-note">{language === "ro" ? "Completează ambele valori pentru calculul consumului." : "Complete both values to calculate consumption."}</p>; })()}</section>
+
+      {(job?.vehicleType === "electric" || job?.vehicleType === "hybrid") && <ChargingCalculator key={`charge-${job.id}`} language={language} initial={job.chargingEntry} onChange={setChargingEntry}/>} 
+      {(job?.vehicleType === "petrol" || job?.vehicleType === "diesel" || job?.vehicleType === "hybrid") && <FuelCalculator key={`fuel-${job.id}`} language={language} initial={job.fuelEntry} onChange={setFuelEntry}/>} 
 
       <div className="form-grid"><Field label={t("waitingAmount")}><input type="number" step="0.01" value={form.waiting} onChange={event => set("waiting", event.target.value)}/></Field><Field label={t("before9")}><label className="check"><input type="checkbox" checked={form.before9} onChange={event => set("before9", event.target.checked)}/><span>{language === "ro" ? "Da" : "Yes"}</span></label></Field></div>
       <div className="section-title compact"><h2>{t("expenses")}</h2><button type="button" className="secondary-button" onClick={() => setRows(current => [...current, blank()])}>+ {t("addExpense")}</button></div>

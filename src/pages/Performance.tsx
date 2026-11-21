@@ -81,7 +81,7 @@ export function PerformancePage() {
 
   return <div className="aris-page">
     <header className="aris-topbar">
-      <div><span className="aris-eyebrow">A.R.I.S. · DRIVER INTELLIGENCE</span><h1>{view === "command" ? (language === "ro" ? <>Bună, <em>Bogdan</em></> : <>Hello, <em>Bogdan</em></>) : view === "performance" ? (language === "ro" ? <>Analiza de <em>performanță</em></> : <>Performance <em>analysis</em></>) : (language === "ro" ? <>Săptămâna ta de <em>lucru</em></> : <>Your <em>work week</em></>)}</h1></div>
+      <div><span className="aris-eyebrow">A.R.I.S. · DRIVER INTELLIGENCE</span><h1>{view === "command" ? (language === "ro" ? <>Bună, <em>{data.profile?.name}</em></> : <>Hello, <em>{data.profile?.name}</em></>) : view === "performance" ? (language === "ro" ? <>Analiza de <em>performanță</em></> : <>Performance <em>analysis</em></>) : (language === "ro" ? <>Săptămâna ta de <em>lucru</em></> : <>Your <em>work week</em></>)}</h1></div>
       <div className="aris-top-actions"><label>{language === "ro" ? "Săptămâna" : "Week"}<input type="date" value={weekStart} onChange={event => chooseWeek(event.target.value)}/></label><span className={`aris-data-state ${snapshot.dataQuality >= 85 ? "ok" : "warn"}`}>{snapshot.dataQuality >= 85 ? <CheckCircle2/> : <AlertTriangle/>}{snapshot.dataQuality}% {language === "ro" ? "date" : "data"}</span></div>
     </header>
 

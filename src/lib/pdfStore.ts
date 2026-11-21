@@ -1,20 +1,10 @@
-const DATABASE = "car-work-tracker-files";
-const STORE = "payslip-pdfs";
-
-const openDatabase = () => new Promise<IDBDatabase>((resolve, reject) => {
-  const request = indexedDB.open(DATABASE, 1);
-  request.onupgradeneeded = () => {
-    if (!request.result.objectStoreNames.contains(STORE)) request.result.createObjectStore(STORE);
-  };
-  request.onsuccess = () => resolve(request.result);
-  request.onerror = () => reject(request.error);
-});
+import { openFileDatabase, PDF_STORE } from "./fileDatabase";
 
 export const savePayslipPdf = async (payslipId: string, file: File) => {
-  const database = await openDatabase();
+  const database = await openFileDatabase();
   await new Promise<void>((resolve, reject) => {
-    const transaction = database.transaction(STORE, "readwrite");
-    transaction.objectStore(STORE).put(file, payslipId);
+    const transaction = database.transaction(PDF_STORE, "readwrite");
+    transaction.objectStore(PDF_STORE).put(file, payslipId);
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error);
   });
@@ -22,9 +12,9 @@ export const savePayslipPdf = async (payslipId: string, file: File) => {
 };
 
 export const getPayslipPdf = async (payslipId: string) => {
-  const database = await openDatabase();
+  const database = await openFileDatabase();
   const file = await new Promise<Blob | null>((resolve, reject) => {
-    const request = database.transaction(STORE, "readonly").objectStore(STORE).get(payslipId);
+    const request = database.transaction(PDF_STORE, "readonly").objectStore(PDF_STORE).get(payslipId);
     request.onsuccess = () => resolve(request.result instanceof Blob ? request.result : null);
     request.onerror = () => reject(request.error);
   });
@@ -33,10 +23,10 @@ export const getPayslipPdf = async (payslipId: string) => {
 };
 
 export const deletePayslipPdf = async (payslipId: string) => {
-  const database = await openDatabase();
+  const database = await openFileDatabase();
   await new Promise<void>((resolve, reject) => {
-    const transaction = database.transaction(STORE, "readwrite");
-    transaction.objectStore(STORE).delete(payslipId);
+    const transaction = database.transaction(PDF_STORE, "readwrite");
+    transaction.objectStore(PDF_STORE).delete(payslipId);
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error);
   });

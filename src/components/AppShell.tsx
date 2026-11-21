@@ -1,4 +1,4 @@
-import { BarChart3, BrainCircuit, CalendarRange, ClipboardPlus, FileCheck2, History, Home, ListPlus, Menu, MonitorCog, Moon, Radar, ReceiptPoundSterling, Settings, ShieldCheck, Sun, Truck, Wifi } from "lucide-react";
+import { BarChart3, BrainCircuit, CalendarRange, ClipboardPlus, FileCheck2, History, Home, ListPlus, Menu, Moon, Radar, ReceiptPoundSterling, Settings, ShieldCheck, Sun, Truck, Wifi } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useData } from "../store/DataContext";
@@ -15,32 +15,23 @@ const mobileItems = [
   ["/", Home, "today"], ["/collect", ClipboardPlus, "collect"], ["/intelligence", BrainCircuit, "insights"], ["/deliver", Truck, "deliver"]
 ] as const;
 
-type ThemeMode = "auto" | "light" | "dark";
-const THEME_KEY = "aris-theme-mode";
-
 function ThemeSwitch({ language }: { language: "ro" | "en" }) {
-  const [mode, setMode] = useState<ThemeMode>(() => {
-    const saved = localStorage.getItem(THEME_KEY);
-    return saved === "light" || saved === "dark" ? saved : "auto";
-  });
+  const { data, setThemeMode } = useData();
+  const [mode, setMode] = useState<"light" | "dark">(data.themeMode === "light" ? "light" : "dark");
 
   useEffect(() => {
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
     const applyTheme = () => {
-      const resolved = mode === "auto" ? (media.matches ? "dark" : "light") : mode;
-      document.documentElement.dataset.theme = resolved;
+      document.documentElement.dataset.theme = mode;
       document.documentElement.dataset.themeMode = mode;
-      localStorage.setItem(THEME_KEY, mode);
+      setThemeMode(mode);
     };
     applyTheme();
-    media.addEventListener("change", applyTheme);
-    return () => media.removeEventListener("change", applyTheme);
   }, [mode]);
 
   const labels = language === "ro"
-    ? { group: "Temă vizuală", auto: "Automat", light: "Zi", dark: "Noapte" }
-    : { group: "Visual theme", auto: "Auto", light: "Day", dark: "Night" };
-  const options: Array<[ThemeMode, typeof MonitorCog, string]> = [["auto", MonitorCog, labels.auto], ["light", Sun, labels.light], ["dark", Moon, labels.dark]];
+    ? { group: "Temă vizuală", light: "Zi", dark: "Noapte" }
+    : { group: "Visual theme", light: "Day", dark: "Night" };
+  const options: Array<["light" | "dark", typeof Sun, string]> = [["light", Sun, labels.light], ["dark", Moon, labels.dark]];
 
   return <div className="theme-switch" role="group" aria-label={labels.group}>
     <span>{labels.group}</span>
@@ -56,7 +47,7 @@ export function AppShell() {
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark"><i/></span><div><strong>A.R.I.S.</strong><small>Adaptive Route Intelligence System</small></div></div>
       <nav>{items.map(([to,Icon,key])=><NavLink key={to} to={to} end={to==="/"} className={({isActive})=>isActive?"active":""}><Icon size={20}/><span>{t(key)}</span></NavLink>)}</nav>
-      <div className="sidebar-core"><Radar/><span><b>NEURAL CORE</b><small>A.R.I.S. 1.5.5</small></span><i/></div>
+      <div className="sidebar-core"><Radar/><span><b>NEURAL CORE</b><small>A.R.I.S. 1.5.6</small></span><i/></div>
       <div className="side-note"><div><Wifi/><span><b>{language === "ro" ? "Sistem online" : "System online"}</b><small>DATA LINK STABLE</small></span><ShieldCheck/></div><small>Standard VAT · Accrual</small></div>
     </aside>
     <main className="main"><Outlet/></main>
