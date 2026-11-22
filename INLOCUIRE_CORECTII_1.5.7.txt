@@ -1,0 +1,18 @@
+A.R.I.S. 1.5.7, corecții pentru bara mobilă și Payslip
+
+1. Deschide proiectul A.R.I.S. 1.5.7.
+2. Copiază folderele și fișierele din acest ZIP peste proiect.
+3. Păstrează structura folderelor exact cum apare în ZIP.
+4. Confirmă înlocuirea celor trei fișiere existente.
+5. Rulează:
+   npm run check
+   npm run build
+
+Fișiere corectate:
+- src/components/AppShell.tsx
+- src/pages/Payslips.tsx
+- src/v157.css
+
+Bara de jos rămâne vizibilă permanent pe telefon și se ascunde numai când tastatura este deschisă.
+Pagina Payslip păstrează rezumatul compact și adaugă analiza detaliată aprobată.
+Versiunea aplicației rămâne 1.5.7.

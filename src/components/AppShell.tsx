@@ -43,21 +43,12 @@ export function AppShell() {
   const { language } = useData(); const t=tFor(language);
   const [mobileNavVisible, setMobileNavVisible] = useState(true);
   useEffect(() => {
-    let timer = window.setTimeout(() => setMobileNavVisible(false), 5000);
-    const show = (event?: Event) => {
-      const target = event?.target as HTMLElement | null;
-      if (target?.matches("input, textarea, select, [contenteditable='true']")) return;
-      setMobileNavVisible(true);
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => setMobileNavVisible(false), 5000);
-    };
-    const focusIn = () => { window.clearTimeout(timer); setMobileNavVisible(false); };
-    const focusOut = () => { window.clearTimeout(timer); };
-    document.addEventListener("pointerdown", show, { passive: true });
-    document.addEventListener("keydown", show);
+    const isEditor = (element: Element | null) => Boolean(element?.matches("input, textarea, select, [contenteditable='true']"));
+    const focusIn = (event: FocusEvent) => { if (isEditor(event.target as Element | null)) setMobileNavVisible(false); };
+    const focusOut = () => { window.setTimeout(() => setMobileNavVisible(!isEditor(document.activeElement)), 80); };
     document.addEventListener("focusin", focusIn);
     document.addEventListener("focusout", focusOut);
-    return () => { window.clearTimeout(timer); document.removeEventListener("pointerdown", show); document.removeEventListener("keydown", show); document.removeEventListener("focusin", focusIn); document.removeEventListener("focusout", focusOut); };
+    return () => { document.removeEventListener("focusin", focusIn); document.removeEventListener("focusout", focusOut); };
   }, []);
   return <div className="app-shell">
     <div className="global-hud-grid" aria-hidden="true"/>
@@ -69,6 +60,6 @@ export function AppShell() {
       <div className="side-note"><div><Wifi/><span><b>{language === "ro" ? "Sistem online" : "System online"}</b><small>{language === "ro" ? "LEGĂTURĂ DATE STABILĂ" : "DATA LINK STABLE"}</small></span><ShieldCheck/></div><small>{language === "ro" ? "TVA standard · Contabilitate de angajamente" : "Standard VAT · Accrual"}</small></div>
     </aside>
     <main className="main"><Outlet/></main>
-    <nav className={`bottom-nav ${mobileNavVisible ? "visible" : "auto-hidden"}`}>{mobileItems.map(([to,Icon,key])=><NavLink key={to} to={to} end={to==="/"} className={({isActive})=>`${isActive?"active":""} ${to==="/intelligence"?"aris-center-nav":""}`.trim()}><Icon size={20}/><span>{to === "/intelligence" ? "A.R.I.S." : t(key)}</span></NavLink>)}<NavLink to="/menu"><Menu size={20}/><span>{t("menu")}</span></NavLink></nav>
+    <nav className={`bottom-nav ${mobileNavVisible ? "visible" : "keyboard-hidden"}`}>{mobileItems.map(([to,Icon,key])=><NavLink key={to} to={to} end={to==="/"} className={({isActive})=>`${isActive?"active":""} ${to==="/intelligence"?"aris-center-nav":""}`.trim()}><Icon size={20}/><span>{to === "/intelligence" ? "A.R.I.S." : t(key)}</span></NavLink>)}<NavLink to="/menu"><Menu size={20}/><span>{t("menu")}</span></NavLink></nav>
   </div>;
 }
